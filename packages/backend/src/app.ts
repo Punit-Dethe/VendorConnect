@@ -10,6 +10,13 @@ import productRoutes from './services/products/product.routes';
 import orderRoutes from './services/orders/order.routes';
 import supplierRoutes from './services/suppliers/supplier.routes';
 
+// Import enhanced routes
+import enhancedProductRoutes from './routes/enhanced-product.routes';
+import enhancedOrderRoutes from './routes/enhanced-order.routes';
+import paymentRoutes from './routes/payment.routes';
+import contractRoutes from './routes/contract.routes';
+import notificationRoutes from './routes/notification.routes';
+
 const app = express();
 
 // Security middleware
@@ -48,6 +55,13 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/suppliers', supplierRoutes);
+
+// Enhanced API routes
+app.use('/api/v2/products', enhancedProductRoutes);
+app.use('/api/v2/orders', enhancedOrderRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling
 app.use(notFoundHandler);
