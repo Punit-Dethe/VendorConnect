@@ -1,0 +1,15 @@
+{
+  "name": "@vendor-supplier/shared",
+  "version": "1.0.0",
+  "description": "Shared types, constants, and utilities for vendor-supplier platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.1.6"
+  }
+}

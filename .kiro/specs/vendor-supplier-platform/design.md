@@ -73,9 +73,9 @@ graph TB
 
 ### Technology Stack
 
-- **Frontend**: React.js with TypeScript, Redux for state management
+- **Frontend**: React.js with JavaScript, Redux for state management
 - **Backend**: Node.js with Express.js framework
-- **Database**: PostgreSQL for transactional data, Redis for caching and real-time features
+- **Database**: Supabase for transactional data, Redis for caching and real-time features
 - **Authentication**: JWT tokens with refresh token mechanism
 - **Real-time Communication**: Socket.io for chat and notifications
 - **Payment Integration**: UPI payment gateway APIs
