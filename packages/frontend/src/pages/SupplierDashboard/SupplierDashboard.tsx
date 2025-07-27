@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Package, BarChart3 } from 'lucide-react';
 import { useRealtime } from '../../components/realtime/RealtimeProvider';
 import OrderApprovalModal from '../../components/orders/OrderApprovalModal';
 import { Navigation } from '../../components/common';
@@ -171,50 +172,120 @@ const SupplierDashboard: React.FC = () => {
   const recentNotifications = notifications.slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       <Navigation userRole="supplier" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Supplier Dashboard</h1>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 space-y-4 sm:space-y-0">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              Supplier Dashboard
+            </h1>
+            <p className="text-gray-600 mt-2 text-lg">Welcome back! Here's your business overview.</p>
+          </div>
           <div className="flex items-center space-x-4">
-            <div className="bg-white px-4 py-2 rounded-lg shadow">
-              <span className="text-sm text-gray-600">Trust Score: </span>
-              <span className="font-bold text-lg text-purple-600">
-                {dashboardData?.trustScore || 0}
-              </span>
+            <div className="card bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+              <div className="card-content py-3 px-4">
+                <div className="flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-medium text-purple-700">Trust Score</span>
+                  <span className="font-bold text-xl text-purple-900">
+                    {dashboardData?.trustScore || 0}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => window.location.href = '/supplier/products'}
+                className="btn btn-outline btn-sm"
+              >
+                <Package className="w-4 h-4 mr-1" />
+                Products
+              </button>
+              <button
+                onClick={() => window.location.href = '/supplier/analytics'}
+                className="btn btn-primary btn-sm"
+              >
+                <BarChart3 className="w-4 h-4 mr-1" />
+                Analytics
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Enhanced Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-gray-700">Total Orders</h3>
-            <p className="text-3xl font-bold text-blue-600">
-              {dashboardData?.stats?.totalOrders || 0}
-            </p>
+          <div className="card card-elevated bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="card-content">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-700 mb-1">Total Orders</p>
+                  <p className="text-3xl font-bold text-blue-900">
+                    {dashboardData?.stats?.totalOrders || 0}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">All time</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                  <Package className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-gray-700">Pending Orders</h3>
-            <p className="text-3xl font-bold text-yellow-600">
-              {pendingOrders.length}
-            </p>
+          <div className="card card-elevated bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+            <div className="card-content">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-yellow-700 mb-1">Pending Orders</p>
+                  <p className="text-3xl font-bold text-yellow-900">
+                    {pendingOrders.length}
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    {pendingOrders.length > 0 ? 'Needs attention' : 'All caught up'}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-500 rounded-xl flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-gray-700">Revenue</h3>
-            <p className="text-3xl font-bold text-green-600">
-              ₹{dashboardData?.stats?.totalRevenue?.toLocaleString() || 0}
-            </p>
+          <div className="card card-elevated bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <div className="card-content">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-green-700 mb-1">Revenue</p>
+                  <p className="text-3xl font-bold text-green-900">
+                    ₹{((dashboardData?.stats?.totalRevenue || 0) / 1000).toFixed(0)}K
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">
+                    ₹{dashboardData?.stats?.totalRevenue?.toLocaleString() || 0} total
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold text-gray-700">Completed Orders</h3>
-            <p className="text-3xl font-bold text-purple-600">
-              {dashboardData?.stats?.completedOrders || 0}
-            </p>
+          <div className="card card-elevated bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <div className="card-content">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-purple-700 mb-1">Completed</p>
+                  <p className="text-3xl font-bold text-purple-900">
+                    {dashboardData?.stats?.completedOrders || 0}
+                  </p>
+                  <p className="text-xs text-purple-600 mt-1">Successful orders</p>
+                </div>
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                  <Package className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

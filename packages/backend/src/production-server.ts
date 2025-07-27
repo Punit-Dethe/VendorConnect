@@ -176,7 +176,7 @@ const initializeSampleData = () => {
     {
       id: generateId(),
       mobile: '9876543210',
-      password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RjkYQ1Wye',
+      password: '$2a$12$DrSXDIXOX78baJ5fifGh5ON67ILFfEeCF6uq.togNrhq8tH07iRqK',
       name: 'Raj Kumar',
       email: 'raj@vendor.com',
       role: 'vendor',
@@ -193,7 +193,7 @@ const initializeSampleData = () => {
     {
       id: generateId(),
       mobile: '9876543211',
-      password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RjkYQ1Wye',
+      password: '$2a$12$DrSXDIXOX78baJ5fifGh5ON67ILFfEeCF6uq.togNrhq8tH07iRqK',
       name: 'Priya Sharma',
       email: 'priya@supplier.com',
       role: 'supplier',
@@ -210,7 +210,7 @@ const initializeSampleData = () => {
     {
       id: generateId(),
       mobile: '9876543212',
-      password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RjkYQ1Wye',
+      password: '$2a$12$DrSXDIXOX78baJ5fifGh5ON67ILFfEeCF6uq.togNrhq8tH07iRqK',
       name: 'Delhi Spices Ltd',
       email: 'delhi@supplier.com',
       role: 'supplier',
@@ -1539,6 +1539,369 @@ app.post('/api/contracts/:contractId/sign', authenticateToken, (req: any, res) =
     res.status(500).json({
       success: false,
       error: { message: 'Failed to sign contract' }
+    });
+  }
+});
+
+// ===== PRODUCT MANAGEMENT ENDPOINTS =====
+
+// Get supplier products
+app.get('/api/supplier/products', authenticateToken, (req: any, res) => {
+  try {
+    if (req.user.role !== 'supplier') {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Access denied' }
+      });
+    }
+
+    const supplierProducts = products.filter(p => p.supplierId === req.user.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const productsWithAlerts = supplierProducts.map(product => ({
+      ...product,
+      needsRestock: product.stockQuantity <= product.minOrderQuantity,
+      stockStatus: product.stockQuantity <= product.minOrderQuantity ? 'low' :
+        product.stockQuantity <= (product.minOrderQuantity * 2) ? 'medium' : 'high'
+    }));
+
+    res.json({
+      success: true,
+      data: productsWithAlerts
+    });
+  } catch (error) {
+    console.error('Get supplier products error:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load products' }
+    });
+  }
+});
+
+// Add new product
+app.post('/api/supplier/products', authenticateToken, (req: any, res) => {
+  try {
+    if (req.user.role !== 'supplier') {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Access denied' }
+      });
+    }
+
+    const { name, description, category, unit, pricePerUnit, stockQuantity, minOrderQuantity, images } = req.body;
+
+    // Validation
+    if (!name || !category || !unit || !pricePerUnit || !stockQuantity || !minOrderQuantity) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'All required fields must be provided' }
+      });
+    }
+
+    if (pricePerUnit <= 0 || stockQuantity < 0 || minOrderQuantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Price and quantities must be positive numbers' }
+      });
+    }
+
+    const newProduct = {
+      id: generateId(),
+      supplierId: req.user.id,
+      name,
+      description: description || '',
+      category,
+      unit,
+      pricePerUnit: parseFloat(pricePerUnit),
+      stockQuantity: parseInt(stockQuantity),
+      minOrderQuantity: parseInt(minOrderQuantity),
+      images: images || [],
+      isAvailable: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    products.push(newProduct);
+
+    // Check if stock is low and create alert
+    if (newProduct.stockQuantity <= newProduct.minOrderQuantity) {
+      createNotification(
+        req.user.id,
+        'stock_alert',
+        'Low Stock Alert',
+        `${newProduct.name} is running low on stock (${newProduct.stockQuantity} remaining)`,
+        {
+          productId: newProduct.id,
+          productName: newProduct.name,
+          currentStock: newProduct.stockQuantity,
+          minRequired: newProduct.minOrderQuantity
+        }
+      );
+    }
+
+    console.log(`✅ New product added: ${newProduct.name} by ${req.user.name}`);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...newProduct,
+        needsRestock: newProduct.stockQuantity <= newProduct.minOrderQuantity,
+        stockStatus: newProduct.stockQuantity <= newProduct.minOrderQuantity ? 'low' :
+          newProduct.stockQuantity <= (newProduct.minOrderQuantity * 2) ? 'medium' : 'high'
+      }
+    });
+  } catch (error) {
+    console.error('Add product error:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to add product' }
+    });
+  }
+});
+
+// Update product
+app.put('/api/supplier/products/:productId', authenticateToken, (req: any, res) => {
+  try {
+    if (req.user.role !== 'supplier') {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Access denied' }
+      });
+    }
+
+    const { productId } = req.params;
+    const { name, description, category, unit, pricePerUnit, stockQuantity, minOrderQuantity, images, isAvailable } = req.body;
+
+    const productIndex = products.findIndex(p => p.id === productId && p.supplierId === req.user.id);
+    if (productIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Product not found' }
+      });
+    }
+
+    const product = products[productIndex];
+    const oldStock = product.stockQuantity;
+
+    // Update product
+    products[productIndex] = {
+      ...product,
+      name: name || product.name,
+      description: description !== undefined ? description : product.description,
+      category: category || product.category,
+      unit: unit || product.unit,
+      pricePerUnit: pricePerUnit ? parseFloat(pricePerUnit) : product.pricePerUnit,
+      stockQuantity: stockQuantity !== undefined ? parseInt(stockQuantity) : product.stockQuantity,
+      minOrderQuantity: minOrderQuantity ? parseInt(minOrderQuantity) : product.minOrderQuantity,
+      images: images !== undefined ? images : product.images,
+      isAvailable: isAvailable !== undefined ? isAvailable : product.isAvailable,
+      updatedAt: new Date()
+    };
+
+    const updatedProduct = products[productIndex];
+
+    // Check for stock alerts
+    if (updatedProduct.stockQuantity <= updatedProduct.minOrderQuantity && oldStock > updatedProduct.minOrderQuantity) {
+      createNotification(
+        req.user.id,
+        'stock_alert',
+        'Low Stock Alert',
+        `${updatedProduct.name} is now running low on stock (${updatedProduct.stockQuantity} remaining)`,
+        {
+          productId: updatedProduct.id,
+          productName: updatedProduct.name,
+          currentStock: updatedProduct.stockQuantity,
+          minRequired: updatedProduct.minOrderQuantity
+        }
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        ...updatedProduct,
+        needsRestock: updatedProduct.stockQuantity <= updatedProduct.minOrderQuantity,
+        stockStatus: updatedProduct.stockQuantity <= updatedProduct.minOrderQuantity ? 'low' :
+          updatedProduct.stockQuantity <= (updatedProduct.minOrderQuantity * 2) ? 'medium' : 'high'
+      }
+    });
+  } catch (error) {
+    console.error('Update product error:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to update product' }
+    });
+  }
+});
+
+// Delete product
+app.delete('/api/supplier/products/:productId', authenticateToken, (req: any, res) => {
+  try {
+    if (req.user.role !== 'supplier') {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Access denied' }
+      });
+    }
+
+    const { productId } = req.params;
+    const productIndex = products.findIndex(p => p.id === productId && p.supplierId === req.user.id);
+
+    if (productIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        error: { message: 'Product not found' }
+      });
+    }
+
+    const deletedProduct = products.splice(productIndex, 1)[0];
+
+    res.json({
+      success: true,
+      data: { message: `Product ${deletedProduct.name} deleted successfully` }
+    });
+  } catch (error) {
+    console.error('Delete product error:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to delete product' }
+    });
+  }
+});
+
+// Get supplier analytics
+app.get('/api/supplier/analytics', authenticateToken, (req: any, res) => {
+  try {
+    if (req.user.role !== 'supplier') {
+      return res.status(403).json({
+        success: false,
+        error: { message: 'Access denied' }
+      });
+    }
+
+    const supplierProducts = products.filter(p => p.supplierId === req.user.id);
+    const supplierOrders = orders.filter(o => o.supplierId === req.user.id);
+    const supplierPayments = payments.filter(p => p.supplierId === req.user.id);
+
+    // Calculate analytics
+    const totalProducts = supplierProducts.length;
+    const activeProducts = supplierProducts.filter(p => p.isAvailable).length;
+    const lowStockProducts = supplierProducts.filter(p => p.stockQuantity <= p.minOrderQuantity).length;
+
+    const totalOrders = supplierOrders.length;
+    const pendingOrders = supplierOrders.filter(o => o.status === 'pending').length;
+    const approvedOrders = supplierOrders.filter(o => o.status === 'approved').length;
+    const completedOrders = supplierOrders.filter(o => o.status === 'delivered').length;
+    const rejectedOrders = supplierOrders.filter(o => o.status === 'rejected').length;
+
+    const totalRevenue = supplierPayments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0);
+    const pendingPayments = supplierPayments.filter(p => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0);
+
+    // Monthly data (last 6 months)
+    const monthlyData = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+      const monthOrders = supplierOrders.filter(o => {
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= monthStart && orderDate <= monthEnd;
+      });
+
+      const monthRevenue = supplierPayments.filter(p => {
+        const paymentDate = new Date(p.createdAt);
+        return paymentDate >= monthStart && paymentDate <= monthEnd && p.status === 'completed';
+      }).reduce((sum, p) => sum + p.amount, 0);
+
+      monthlyData.push({
+        month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        orders: monthOrders.length,
+        revenue: monthRevenue,
+        completedOrders: monthOrders.filter(o => o.status === 'delivered').length
+      });
+    }
+
+    // Top products by orders
+    const productOrderCounts: { [key: string]: number } = {};
+    supplierOrders.forEach(order => {
+      order.items.forEach((item: any) => {
+        const product = supplierProducts.find(p => p.id === item.productId);
+        if (product) {
+          productOrderCounts[product.id] = (productOrderCounts[product.id] || 0) + item.quantity;
+        }
+      });
+    });
+
+    const topProducts = supplierProducts
+      .map(product => ({
+        ...product,
+        totalOrdered: productOrderCounts[product.id] || 0
+      }))
+      .sort((a, b) => b.totalOrdered - a.totalOrdered)
+      .slice(0, 5);
+
+    // Category breakdown
+    const categoryStats: { [key: string]: { count: number; totalStock: number; totalValue: number } } = {};
+    supplierProducts.forEach(product => {
+      if (!categoryStats[product.category]) {
+        categoryStats[product.category] = {
+          count: 0,
+          totalStock: 0,
+          totalValue: 0
+        };
+      }
+      categoryStats[product.category].count++;
+      categoryStats[product.category].totalStock += product.stockQuantity;
+      categoryStats[product.category].totalValue += product.stockQuantity * product.pricePerUnit;
+    });
+
+    const analytics = {
+      overview: {
+        totalProducts,
+        activeProducts,
+        lowStockProducts,
+        totalOrders,
+        pendingOrders,
+        completedOrders,
+        totalRevenue,
+        pendingPayments,
+        trustScore: calculateTrustScore(req.user.id, 'supplier')
+      },
+      orderStats: {
+        pending: pendingOrders,
+        approved: approvedOrders,
+        completed: completedOrders,
+        rejected: rejectedOrders,
+        completionRate: totalOrders > 0 ? Math.round((completedOrders / totalOrders) * 100) : 0
+      },
+      monthlyData,
+      topProducts,
+      categoryStats: Object.entries(categoryStats).map(([category, stats]) => ({
+        category,
+        count: stats.count,
+        totalStock: stats.totalStock,
+        totalValue: stats.totalValue
+      })),
+      stockAlerts: supplierProducts.filter(p => p.stockQuantity <= p.minOrderQuantity).map(product => ({
+        id: product.id,
+        name: product.name,
+        currentStock: product.stockQuantity,
+        minRequired: product.minOrderQuantity,
+        category: product.category
+      }))
+    };
+
+    res.json({
+      success: true,
+      data: analytics
+    });
+  } catch (error) {
+    console.error('Get supplier analytics error:', error);
+    res.status(500).json({
+      success: false,
+      error: { message: 'Failed to load analytics' }
     });
   }
 });
