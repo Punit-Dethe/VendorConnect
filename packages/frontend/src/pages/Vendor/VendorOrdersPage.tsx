@@ -21,6 +21,7 @@ import {
 import { useAppSelector, useAppDispatch } from '../../hooks/redux'
 import { logout } from '../../store/slices/auth.slice'
 import toast from 'react-hot-toast'
+import ChatModal from '../../components/chat/ChatModal'
 
 interface Order {
   id: string
@@ -77,8 +78,10 @@ export default function VendorOrdersPage() {
   const dispatch = useAppDispatch()
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [currentChatRecipient, setCurrentChatRecipient] = useState<{ id: string, name: string } | null>(null);
+  const [currentChatRoomId, setCurrentChatRoomId] = useState<string>('');
 
   const handleLogout = () => {
     dispatch(logout())
@@ -456,13 +459,22 @@ export default function VendorOrdersPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => {
+                        // Logic for viewing order details if needed, otherwise remove
+                      }}
                       className="btn btn-outline text-sm"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       View Details
                     </button>
-                    <button className="btn btn-outline text-sm">
+                    <button
+                      onClick={() => {
+                        setCurrentChatRecipient({ id: order.supplier.id, name: order.supplier.businessName });
+                        setCurrentChatRoomId(order.id); // Use order ID as chat room ID
+                        setShowChatModal(true);
+                      }}
+                      className="btn btn-outline text-sm"
+                    >
                       <MessageCircle className="w-4 h-4 mr-1" />
                       Chat
                     </button>
@@ -489,7 +501,8 @@ export default function VendorOrdersPage() {
                     )}
 
                     {order.orderType === 'recurring' && (
-                      <button className="btn btn-outline text-sm">
+                      <button className="btn btn-outline text-sm"
+                      >
                         <RefreshCw className="w-4 h-4 mr-1" />
                         Manage Recurring
                       </button>
@@ -519,109 +532,14 @@ export default function VendorOrdersPage() {
         )}
       </div>
 
-      {/* Order Details Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          <div className="absolute inset-0 bg-black bg-opacity-50" onClick={() => setSelectedOrder(null)}></div>
-          <div className="absolute right-0 top-0 h-full w-96 bg-white shadow-xl overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold">Order Details</h2>
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Order Information</h3>
-                  <div className="space-y-2 text-sm">
-                    <p><strong>Order Number:</strong> {selectedOrder.orderNumber}</p>
-                    <p><strong>Status:</strong>
-                      <span className={`ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs ${getStatusColor(selectedOrder.status)}`}>
-                        {getStatusLabel(selectedOrder.status)}
-                      </span>
-                    </p>
-                    <p><strong>Type:</strong> {selectedOrder.orderType === 'recurring' ? 'Recurring' : 'One-time'}</p>
-                    <p><strong>Order Date:</strong> {formatDate(selectedOrder.orderDate)}</p>
-                    {selectedOrder.expectedDelivery && (
-                      <p><strong>Expected Delivery:</strong> {formatDate(selectedOrder.expectedDelivery)}</p>
-                    )}
-                    {selectedOrder.actualDelivery && (
-                      <p><strong>Actual Delivery:</strong> {formatDate(selectedOrder.actualDelivery)}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Supplier Details</h3>
-                  <div className="space-y-2 text-sm">
-                    <p><strong>Business:</strong> {selectedOrder.supplier.businessName}</p>
-                    <p><strong>Contact:</strong> {selectedOrder.supplier.name}</p>
-                    <p><strong>Location:</strong> {selectedOrder.supplier.location}</p>
-                    <p><strong>Phone:</strong> {selectedOrder.supplier.phone}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Items Ordered</h3>
-                  <div className="space-y-3">
-                    {selectedOrder.items.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                        <div>
-                          <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-gray-600">
-                            {item.quantity} {item.unit} × {formatCurrency(item.price)}
-                          </p>
-                        </div>
-                        <p className="font-semibold">{formatCurrency(item.total)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-lg font-semibold">Total Amount:</span>
-                    <span className="text-xl font-bold text-blue-600">
-                      {formatCurrency(selectedOrder.totalAmount)}
-                    </span>
-                  </div>
-                  <p className={`text-sm ${getPaymentStatusColor(selectedOrder.paymentStatus)}`}>
-                    Payment Status: {selectedOrder.paymentStatus.charAt(0).toUpperCase() + selectedOrder.paymentStatus.slice(1)}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Payment Method: {selectedOrder.paymentMethod.toUpperCase()}
-                  </p>
-                </div>
-
-                {selectedOrder.notes && (
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Notes</h3>
-                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-                      {selectedOrder.notes}
-                    </p>
-                  </div>
-                )}
-
-                {selectedOrder.orderType === 'recurring' && (
-                  <div>
-                    <h3 className="font-medium text-gray-900 mb-2">Recurring Details</h3>
-                    <div className="space-y-2 text-sm">
-                      <p><strong>Frequency:</strong> {selectedOrder.recurringFrequency}</p>
-                      {selectedOrder.nextRecurringDate && (
-                        <p><strong>Next Order:</strong> {formatDate(selectedOrder.nextRecurringDate)}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+      {showChatModal && currentChatRecipient && currentChatRoomId && (
+        <ChatModal
+          isOpen={showChatModal}
+          onClose={() => setShowChatModal(false)}
+          recipientName={currentChatRecipient.name}
+          recipientId={currentChatRecipient.id}
+          chatRoomId={currentChatRoomId}
+        />
       )}
     </div>
   )

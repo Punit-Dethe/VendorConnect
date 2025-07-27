@@ -1023,8 +1023,6 @@ app.post('/api/supplier/orders/:id/reject', authenticateToken, async (req: any, 
       return res.status(403).json({ success: false, error: { message: 'Access denied' } });
     }
 
-    const { reason } = req.body;
-
     const orderIndex = orders.findIndex(o => o.id === orderId && o.supplier_id === supplierId);
     
     if (orderIndex === -1) {
@@ -1032,7 +1030,6 @@ app.post('/api/supplier/orders/:id/reject', authenticateToken, async (req: any, 
     }
 
     orders[orderIndex].status = 'rejected';
-    orders[orderIndex].rejection_reason = reason;
     orders[orderIndex].updated_at = new Date();
 
     // Create notification for vendor
@@ -1040,9 +1037,9 @@ app.post('/api/supplier/orders/:id/reject', authenticateToken, async (req: any, 
       id: generateId(),
       user_id: orders[orderIndex].vendor_id,
       title: 'Order Rejected',
-      message: `Your order ${orders[orderIndex].order_number} has been rejected. Reason: ${reason}`,
+      message: `Your order ${orders[orderIndex].order_number} has been rejected.`,
       type: 'order_rejected',
-      data: { orderId, reason },
+      data: { orderId },
       is_read: false,
       created_at: new Date()
     };
@@ -1051,7 +1048,7 @@ app.post('/api/supplier/orders/:id/reject', authenticateToken, async (req: any, 
 
     // Send real-time notification
     io.to(`user_${orders[orderIndex].vendor_id}`).emit('new_notification', notification);
-    io.to(`user_${orders[orderIndex].vendor_id}`).emit('order_rejected', { order: orders[orderIndex], reason });
+    io.to(`user_${orders[orderIndex].vendor_id}`).emit('order_rejected', orders[orderIndex]);
 
     res.json({
       success: true,
@@ -1060,6 +1057,83 @@ app.post('/api/supplier/orders/:id/reject', authenticateToken, async (req: any, 
   } catch (error) {
     console.error('Reject order error:', error);
     res.status(500).json({ success: false, error: { message: 'Failed to reject order' } });
+  }
+});
+
+// Get chat messages for an order (orderId acts as chatRoomId)
+app.get('/api/chat/messages/:orderId', authenticateToken, async (req: any, res) => {
+  try {
+    const orderId = req.params.orderId;
+    const userId = req.user.id; // Current authenticated user
+
+    // Ensure the user is part of this order (either vendor or supplier)
+    const order = orders.find(o => o.id === orderId && (o.vendor_id === userId || o.supplier_id === userId));
+    if (!order) {
+      return res.status(403).json({ success: false, error: { message: 'Access denied to this chat room' } });
+    }
+
+    const orderChatMessages = chatMessages
+      .filter(m => m.room_id === orderId)
+      .map(m => {
+        const sender = users.find(u => u.id === m.sender_id);
+        return {
+          id: m.id,
+          sender_id: m.sender_id,
+          sender_name: sender ? sender.name : 'Unknown User',
+          content: m.content,
+          created_at: m.created_at,
+          message_type: m.message_type,
+          is_read: m.is_read // Assuming is_read is handled client-side or for tracking
+        };
+      });
+
+    res.json({
+      success: true,
+      data: orderChatMessages
+    });
+  } catch (error) {
+    console.error('Fetch chat messages error:', error);
+    res.status(500).json({ success: false, error: { message: 'Failed to fetch chat messages' } });
+  }
+});
+
+// Get all chat rooms for a user (simplified for now)
+app.get('/api/chat/rooms', authenticateToken, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    let userChatRooms: any[] = [];
+
+    // Find orders where the user is either the vendor or the supplier
+    const relevantOrders = orders.filter(o => o.vendor_id === userId || o.supplier_id === userId);
+
+    relevantOrders.forEach(order => {
+      const otherParticipantId = userRole === 'vendor' ? order.supplier_id : order.vendor_id;
+      const otherParticipant = users.find(u => u.id === otherParticipantId);
+
+      if (otherParticipant) {
+        const lastMessage = chatMessages
+          .filter(m => m.room_id === order.id)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        
+        userChatRooms.push({
+          id: order.id, // Chat room ID is the order ID
+          name: otherParticipant.name, // Name of the other participant
+          lastMessage: lastMessage ? lastMessage.content : 'No messages yet',
+          lastMessageTime: lastMessage ? lastMessage.created_at : order.created_at,
+          unreadCount: 0 // Placeholder, implement proper unread count logic if needed
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: userChatRooms
+    });
+  } catch (error) {
+    console.error('Fetch chat rooms error:', error);
+    res.status(500).json({ success: false, error: { message: 'Failed to fetch chat rooms' } });
   }
 });
 
@@ -1406,39 +1480,6 @@ app.get('/api/chat/rooms', authenticateToken, async (req: any, res) => {
   } catch (error) {
     console.error('Chat rooms error:', error);
     res.status(500).json({ success: false, error: { message: 'Failed to get chat rooms' } });
-  }
-});
-
-app.get('/api/chat/messages/:orderId', authenticateToken, async (req: any, res) => {
-  try {
-    const orderId = req.params.orderId;
-    const userId = req.user.id;
-    
-    // Verify user is part of this order
-    const order = orders.find(o => o.id === orderId && (o.vendor_id === userId || o.supplier_id === userId));
-    
-    if (!order) {
-      return res.status(403).json({ success: false, error: { message: 'Access denied' } });
-    }
-
-    const orderMessages = chatMessages
-      .filter(m => m.room_id === orderId)
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-    // Mark messages as read
-    chatMessages.forEach(message => {
-      if (message.room_id === orderId && message.sender_id !== userId) {
-        message.is_read = true;
-      }
-    });
-
-    res.json({
-      success: true,
-      data: orderMessages
-    });
-  } catch (error) {
-    console.error('Chat messages error:', error);
-    res.status(500).json({ success: false, error: { message: 'Failed to get chat messages' } });
   }
 });
 

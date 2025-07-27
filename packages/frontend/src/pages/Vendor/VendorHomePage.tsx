@@ -12,11 +12,14 @@ import {
   Filter,
   TrendingUp,
   LogOut,
+  Bell, // Add Bell icon for notifications
   Settings
 } from 'lucide-react'
 import { useAppSelector, useAppDispatch } from '../../hooks/redux'
 import { logout } from '../../store/slices/auth.slice'
 import { useRealtime } from '../../components/realtime/RealtimeProvider'
+import api from '../../services/api' // Import api for loading notifications
+import ChatModal from '../../components/chat/ChatModal' // Import ChatModal
 
 interface Supplier {
   id: string
@@ -34,6 +37,16 @@ interface Supplier {
   priceRange: 'low' | 'medium' | 'high'
 }
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  data: any;
+  is_read: boolean;
+  created_at: string;
+}
+
 const formatTrustScore = (score: number): string => {
   return `${Math.round(score)}/100`;
 };
@@ -41,7 +54,7 @@ const formatTrustScore = (score: number): string => {
 export default function VendorHomePage() {
   const { user } = useAppSelector((state: any) => state.auth)
   const dispatch = useAppDispatch()
-  const { notifications } = useRealtime()
+  const { notifications: realtimeNotifications, isConnected, joinUserRoom } = useRealtime() // Use realtime notifications
   const [activeTab, setActiveTab] = useState<'recommended' | 'search'>('recommended')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
@@ -49,19 +62,69 @@ export default function VendorHomePage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [newSuppliers, setNewSuppliers] = useState<Supplier[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [notifications, setNotifications] = useState<Notification[]>([]); // Local state for notifications
+  const [showNotifications, setShowNotifications] = useState(false); // State to control notification dropdown
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [currentChatRecipient, setCurrentChatRecipient] = useState<{ id: string, name: string } | null>(null);
+  const [currentChatRoomId, setCurrentChatRoomId] = useState<string>('');
 
   useEffect(() => {
     fetchSuppliers();
-  }, []);
+    loadNotifications(); // Load notifications on mount
+
+    if (user?.id && isConnected) {
+      joinUserRoom(user.id);
+    }
+  }, [user?.id, isConnected]);
 
   // Listen for new supplier notifications and refresh
   useEffect(() => {
-    const newSupplierNotifications = notifications.filter(n => n.type === 'new_supplier');
-    if (newSupplierNotifications.length > 0) {
-      console.log('🔄 New supplier registered, refreshing homepage suppliers');
-      fetchSuppliers();
+    if (realtimeNotifications.length > 0) {
+      // Convert real-time notifications to the expected format
+      const formattedRealtimeNotifications = realtimeNotifications.map(rn => ({
+        id: rn.id,
+        title: rn.title,
+        message: rn.message,
+        type: rn.type,
+        data: rn.data,
+        is_read: rn.isRead || false,
+        created_at: rn.createdAt?.toISOString() || new Date().toISOString()
+      }));
+      
+      // Merge with existing notifications, avoiding duplicates
+      setNotifications(prevNotifications => {
+        const existingIds = new Set(prevNotifications.map(n => n.id));
+        const newNotifications = formattedRealtimeNotifications.filter(rn => !existingIds.has(rn.id));
+        return [...newNotifications, ...prevNotifications];
+      });
+      
+      const newSupplierNotifications = realtimeNotifications.filter(n => n.type === 'new_supplier');
+      if (newSupplierNotifications.length > 0) {
+        console.log('🔄 New supplier registered, refreshing homepage suppliers');
+        fetchSuppliers(); // Refresh suppliers when a new one registers
+      }
     }
-  }, [notifications]);
+  }, [realtimeNotifications]);
+
+  const loadNotifications = async () => {
+    try {
+      const response = await api.get('/api/notifications');
+      setNotifications(response.data.data || []);
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  };
+
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      await api.put(`/api/notifications/${notificationId}/read`);
+      setNotifications(notifications.map(n =>
+        n.id === notificationId ? { ...n, is_read: true } : n
+      ));
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
 
   const fetchSuppliers = async () => {
     try {
@@ -131,7 +194,7 @@ export default function VendorHomePage() {
       distance: 1.2,
       isRecommended: true,
       specialties: ['Organic Vegetables', 'Same Day Delivery'],
-      priceRange: 'medium'
+      priceRange: 'medium' as const
     },
     {
       id: '2',
@@ -146,7 +209,7 @@ export default function VendorHomePage() {
       distance: 2.1,
       isRecommended: true,
       specialties: ['Authentic Spices', 'Bulk Orders'],
-      priceRange: 'low'
+      priceRange: 'low' as const
     },
     {
       id: '3',
@@ -161,13 +224,13 @@ export default function VendorHomePage() {
       distance: 3.5,
       isRecommended: true,
       specialties: ['Premium Grains', 'Wholesale Rates'],
-      priceRange: 'medium'
+      priceRange: 'medium' as const
     }
   ]
 
   // Use real suppliers data, fallback to mock if empty
   const currentRecommendedSuppliers = recommendedSuppliers.length > 0 ? recommendedSuppliers : mockRecommendedSuppliers;
-  const allSuppliers = suppliers.length > 0 ? suppliers : [
+  const allSuppliers = suppliers.length > 0 ? suppliers : ([ // Explicitly cast the array literal to Supplier[]
     ...mockRecommendedSuppliers,
     {
       id: '4',
@@ -181,7 +244,7 @@ export default function VendorHomePage() {
       categories: ['Dairy', 'Beverages'],
       distance: 2.8,
       specialties: ['Fresh Dairy', 'Cold Chain'],
-      priceRange: 'high'
+      priceRange: 'high' as const
     },
     {
       id: '5',
@@ -195,9 +258,9 @@ export default function VendorHomePage() {
       categories: ['Oils', 'Condiments'],
       distance: 4.2,
       specialties: ['Cooking Oils', 'Bulk Supply'],
-      priceRange: 'medium'
+      priceRange: 'medium' as const
     }
-  ]
+  ] as Supplier[])
 
   const categories = ['all', 'Vegetables', 'Fruits', 'Spices', 'Grains', 'Dairy', 'Oils', 'Condiments']
   const regions = ['all', 'Andheri', 'Crawford Market', 'Dadar', 'Bandra', 'Malad', 'Kurla', 'Borivali', 'Thane']
@@ -299,7 +362,14 @@ export default function VendorHomePage() {
             <ShoppingCart className="w-4 h-4 mr-2" />
             View Products
           </Link>
-          <button className="btn btn-outline">
+          <button
+            onClick={() => {
+              setCurrentChatRecipient({ id: supplier.id, name: supplier.businessName });
+              setCurrentChatRoomId(`general_${user?.id}_${supplier.id}`); // Create a general chat room ID
+              setShowChatModal(true);
+            }}
+            className="btn btn-outline flex-1"
+          >
             <MessageCircle className="w-4 h-4 mr-2" />
             Chat
           </button>
@@ -329,6 +399,68 @@ export default function VendorHomePage() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              {/* Live Connection Status */}
+              {isConnected && (
+                <div className="flex items-center space-x-2 bg-green-50 px-2 py-1 rounded-lg">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-green-700 text-xs font-medium">Live</span>
+                </div>
+              )}
+
+              {/* Notifications */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative p-2 text-gray-600 hover:text-indigo-600 transition-colors"
+                >
+                  <Bell className="h-6 w-6" />
+                  {notifications.filter(n => !n.is_read).length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {notifications.filter(n => !n.is_read).length}
+                    </span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 z-50">
+                    <div className="p-4 border-b">
+                      <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length > 0 ? (
+                        notifications.map((notification) => (
+                          <div
+                            key={notification.id}
+                            className={`p-4 ${!notification.is_read ? 'bg-blue-50' : ''} hover:bg-gray-50 cursor-pointer`}
+                            onClick={() => !notification.is_read && markNotificationAsRead(notification.id)}
+                          >
+                            <h4 className="font-medium text-gray-900">{notification.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {new Date(notification.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="p-4 text-sm text-gray-500">No new notifications.</p>
+                      )}
+                    </div>
+                    {notifications.length > 0 && (
+                      <div className="p-4 border-t">
+                        <button 
+                          onClick={() => {
+                            notifications.filter(n => !n.is_read).forEach(n => markNotificationAsRead(n.id));
+                            setShowNotifications(false);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          Mark all as read
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="text-right">
                 <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
                 <p className="text-xs text-gray-500">{user?.businessType}</p>
@@ -538,6 +670,15 @@ export default function VendorHomePage() {
           </div>
         )}
       </div>
+      {showChatModal && currentChatRecipient && user?.id && (
+        <ChatModal
+          isOpen={showChatModal}
+          onClose={() => setShowChatModal(false)}
+          recipientName={currentChatRecipient.name}
+          recipientId={currentChatRecipient.id}
+          chatRoomId={currentChatRoomId}
+        />
+      )}
     </div>
   )
 }

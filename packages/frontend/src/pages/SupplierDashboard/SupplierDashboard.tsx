@@ -28,6 +28,8 @@ import {
   XCircle
 } from 'lucide-react';
 import api from '../../services/api';
+import ChatModal from '../../components/chat/ChatModal';
+import { useRealtime } from '../../components/realtime/RealtimeProvider';
 
 interface Product {
   id: string;
@@ -84,9 +86,18 @@ interface LowStockAlert {
   minRequired: number;
 }
 
+interface ChatRoom {
+  id: string; // This is the orderId
+  name: string; // Name of the other participant (vendor)
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+}
+
 const SupplierDashboard: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
   const location = useLocation();
+  const { isConnected, joinUserRoom } = useRealtime(); // Use realtime context
   
   const [activeTab, setActiveTab] = useState('dashboard');
   const [products, setProducts] = useState<Product[]>([]);
@@ -105,6 +116,10 @@ const SupplierDashboard: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [currentChatRecipient, setCurrentChatRecipient] = useState<{ id: string, name: string } | null>(null);
+  const [currentChatRoomId, setCurrentChatRoomId] = useState<string>('');
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
 
   const [productForm, setProductForm] = useState({
     name: '',
@@ -124,7 +139,22 @@ const SupplierDashboard: React.FC = () => {
     loadDashboardData();
     loadProducts();
     loadOrders();
-  }, []);
+    loadChatRooms();
+    
+    // Join user room for real-time notifications/messages
+    if (user?.id && isConnected) {
+      joinUserRoom(user.id);
+    }
+  }, [user?.id, isConnected]);
+
+  const loadChatRooms = async () => {
+    try {
+      const response = await api.get('/api/chat/rooms');
+      setChatRooms(response.data.data);
+    } catch (error) {
+      console.error('Failed to load chat rooms:', error);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -174,9 +204,28 @@ const SupplierDashboard: React.FC = () => {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const { name, description, category, unit, price_per_unit, stock_quantity, min_order_quantity, images } = productForm;
+
+    // Client-side validation for numeric fields
+    if (isNaN(parseFloat(price_per_unit)) || isNaN(parseInt(stock_quantity)) || isNaN(parseInt(min_order_quantity))) {
+      alert('Please enter valid numbers for price, stock, and minimum order quantity.');
+      return;
+    }
+
     try {
       setLoading(true);
-      await api.post('/api/supplier/products', productForm);
+      const productDataToSend = {
+        name,
+        description,
+        category,
+        unit,
+        price_per_unit: parseFloat(price_per_unit),
+        stock_quantity: parseInt(stock_quantity),
+        min_order_quantity: parseInt(min_order_quantity),
+        images,
+      };
+      await api.post('/api/supplier/products', productDataToSend);
       loadProducts();
       loadDashboardData();
       setShowAddProduct(false);
@@ -193,9 +242,27 @@ const SupplierDashboard: React.FC = () => {
     e.preventDefault();
     if (!selectedProduct) return;
 
+    const { name, description, category, unit, price_per_unit, stock_quantity, min_order_quantity, images } = productForm;
+
+    // Client-side validation for numeric fields
+    if (isNaN(parseFloat(price_per_unit)) || isNaN(parseInt(stock_quantity)) || isNaN(parseInt(min_order_quantity))) {
+      alert('Please enter valid numbers for price, stock, and minimum order quantity.');
+      return;
+    }
+
     try {
       setLoading(true);
-      await api.put(`/api/supplier/products/${selectedProduct.id}`, productForm);
+      const productDataToUpdate = {
+        name,
+        description,
+        category,
+        unit,
+        price_per_unit: parseFloat(price_per_unit),
+        stock_quantity: parseInt(stock_quantity),
+        min_order_quantity: parseInt(min_order_quantity),
+        images,
+      };
+      await api.put(`/api/supplier/products/${selectedProduct.id}`, productDataToUpdate);
       loadProducts();
       loadDashboardData();
       setShowEditProduct(false);
@@ -303,6 +370,12 @@ const SupplierDashboard: React.FC = () => {
   const isActive = (path: string) => {
     const hash = path.substring(1);
     return activeTab === hash;
+  };
+
+  const openChatWithOrder = (order: Order) => {
+    setCurrentChatRecipient({ id: order.vendorId, name: order.vendorName });
+    setCurrentChatRoomId(order.id); // Use order ID as chat room ID
+    setShowChatModal(true);
   };
 
   return (
@@ -653,6 +726,17 @@ const SupplierDashboard: React.FC = () => {
                             <CheckCircle className="h-4 w-4" />
                             <span>Review Order</span>
                           </button>
+                          <button
+                            onClick={() => {
+                              setCurrentChatRecipient({ id: order.vendorId, name: order.vendorName });
+                              setCurrentChatRoomId(order.id);
+                              setShowChatModal(true);
+                            }}
+                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                            <span>Chat</span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -669,8 +753,50 @@ const SupplierDashboard: React.FC = () => {
           </div>
         )}
 
+        {/* Chat Tab */}
+        {activeTab === 'chat' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h2 className="text-xl font-semibold">Messages</h2>
+              </div>
+              <div className="p-6">
+                <h3 className="text-lg font-medium mb-4">Chat Rooms</h3>
+                {chatRooms.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {chatRooms.map((room) => (
+                      <div
+                        key={room.id}
+                        className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={() => openChatWithOrder({ id: room.id, orderNumber: '', vendorName: room.name, vendorMobile: '', vendorId: '', supplierId: '', items: [], totalAmount: 0, status: '', orderType: '', deliveryAddress: '', deliveryCity: '', deliveryPincode: '', estimatedDeliveryTime: '', notes: '', createdAt: '' })}
+                      >
+                        <div>
+                          <h4 className="font-medium text-blue-900">{room.name}</h4>
+                          <p className="text-sm text-blue-700">{room.lastMessage}</p>
+                          <p className="text-xs text-blue-500">{room.lastMessageTime}</p>
+                        </div>
+                        {room.unreadCount > 0 && (
+                          <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
+                            {room.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <MessageCircle className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No chat rooms yet</h3>
+                    <p className="mt-1 text-sm text-gray-500">Start a conversation with a vendor.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Other tabs placeholder */}
-        {!['dashboard', 'products', 'orders'].includes(activeTab) && (
+        {!['dashboard', 'products', 'orders', 'chat'].includes(activeTab) && (
           <div className="bg-white rounded-lg shadow p-6 text-center">
             <h2 className="text-2xl font-semibold mb-4">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h2>
             <p className="text-gray-600">This feature is coming soon!</p>
@@ -1046,6 +1172,17 @@ const SupplierDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Chat Modal */}
+      {showChatModal && currentChatRecipient && currentChatRoomId && (
+        <ChatModal
+          isOpen={showChatModal}
+          onClose={() => setShowChatModal(false)}
+          recipientName={currentChatRecipient.name}
+          recipientId={currentChatRecipient.id}
+          chatRoomId={currentChatRoomId}
+        />
       )}
     </div>
   );
