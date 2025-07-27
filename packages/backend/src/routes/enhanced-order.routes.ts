@@ -1,43 +1,23 @@
-import express from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth.middleware';
-import {
-  createOrder,
-  getSupplierOrders,
-  getVendorOrders,
-  getOrderDetails,
-  approveOrder,
-  rejectOrder,
-  restockProduct,
-  getLowStockProducts
-} from '../controllers/enhanced-order.controller';
+import { Router } from 'express';
+import { EnhancedOrderController, createEnhancedOrderValidation, updateEnhancedOrderStatusValidation } from './enhanced-order.controller';
+import { authenticateToken, requireRole } from '@middleware/auth.middleware';
 
-const router = express.Router();
+const router = Router();
+const enhancedOrderController = new EnhancedOrderController();
 
-// All order routes require authentication
 router.use(authenticateToken);
 
-// Create new order (vendors only)
-router.post('/', createOrder);
+// Routes for vendors (e.g., creating orders)
+router.post('/create', requireRole(['vendor']), createEnhancedOrderValidation, enhancedOrderController.createEnhancedOrder);
 
-// Get orders for supplier
-router.get('/supplier', getSupplierOrders);
+// Routes for both vendors and suppliers
+router.get('/all', requireRole(['vendor', 'supplier']), enhancedOrderController.getAllEnhancedOrders);
+router.get('/:id', requireRole(['vendor', 'supplier']), enhancedOrderController.getEnhancedOrderById);
 
-// Get orders for vendor
-router.get('/vendor', getVendorOrders);
+// Routes for suppliers (e.g., updating order status)
+router.put('/:id/status', requireRole(['supplier']), updateEnhancedOrderStatusValidation, enhancedOrderController.updateEnhancedOrderStatus);
 
-// Get specific order details
-router.get('/:orderId', getOrderDetails);
-
-// Approve order (suppliers only)
-router.post('/:orderId/approve', approveOrder);
-
-// Reject order (suppliers only)
-router.post('/:orderId/reject', rejectOrder);
-
-// Restock product (suppliers only)
-router.post('/restock/:productId', restockProduct);
-
-// Get low stock products (suppliers only)
-router.get('/inventory/low-stock', getLowStockProducts);
+// Admin or highly privileged users might delete orders
+router.delete('/:id', requireRole(['admin']), enhancedOrderController.deleteEnhancedOrder);
 
 export default router;

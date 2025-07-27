@@ -25,7 +25,7 @@ export type PaymentStatus =
 export interface InitiatePaymentRequest {
   orderId: string;
   amount: number;
-  paymentMethod: 'upi' | 'invoice';
+  paymentMethod: 'upi' | 'invoice' | 'pay_later';
 }
 
 export interface UPIPaymentRequest {

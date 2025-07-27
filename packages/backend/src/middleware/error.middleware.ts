@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { ApiResponse } from '../types/shared';
+import { ApiResponse } from '@vendor-supplier/shared/src/types';
+// This AppError is defined in this file, no import needed for it here
 
 export class AppError extends Error {
   public statusCode: number;

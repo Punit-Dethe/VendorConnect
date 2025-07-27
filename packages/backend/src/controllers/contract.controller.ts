@@ -1,98 +1,86 @@
-import { Request, Response } from 'express';
-import contractService from '../services/contracts/contract.service';
+import { Request, Response, NextFunction } from 'express';
+import { ContractService } from '../services/contracts/contract.service';
+import { AppError } from '../middleware/error.middleware';
+import { ApiResponse, Contract } from '@vendor-supplier/shared/src/types';
+import { validationResult } from 'express-validator';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    mobile: string;
-    name: string;
-    email?: string;
-    role: 'vendor' | 'supplier';
-    trust_score: number;
-    is_verified: boolean;
+export class ContractController {
+  private contractService: ContractService;
+
+  constructor() {
+    this.contractService = new ContractService();
+  }
+
+  createContract = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR')); // Removed extra argument
+      }
+
+      const contractData: Partial<Contract> = req.body;
+      const newContract = await this.contractService.createContract(contractData);
+      const response: ApiResponse<Contract> = { success: true, data: newContract };
+      res.status(201).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getContracts = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const contracts = await this.contractService.getContracts();
+      const response: ApiResponse<Contract[]> = { success: true, data: contracts };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getContractById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const contract = await this.contractService.getContractById(id);
+      if (!contract) {
+        return next(new AppError('Contract not found', 404, 'NOT_FOUND'));
+      }
+      const response: ApiResponse<Contract> = { success: true, data: contract };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateContract = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR')); // Removed extra argument
+      }
+
+      const { id } = req.params;
+      const updateData: Partial<Contract> = req.body;
+      const updatedContract = await this.contractService.updateContract(id, updateData);
+      if (!updatedContract) {
+        return next(new AppError('Contract not found or update failed', 404, 'UPDATE_FAILED'));
+      }
+      const response: ApiResponse<Contract> = { success: true, data: updatedContract };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteContract = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      await this.contractService.deleteContract(id);
+      // Changed to adhere to ApiResponse type, success messages go under data or are implied by success: true
+      // As per shared/src/types, ApiResponse does not have a 'message' field on the root for success responses.
+      const response: ApiResponse = { success: true, data: { message: 'Contract deleted successfully' } }; // Adjusted for type compliance
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
   };
 }
-
-export const getContracts = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const contracts = await contractService.getContractsByUser(userId, userRole);
-    res.json(contracts);
-  } catch (error) {
-    console.error('Get contracts error:', error);
-    res.status(500).json({ error: 'Failed to get contracts' });
-  }
-};
-
-export const getContractById = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { contractId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const contract = await contractService.getContractById(parseInt(contractId));
-
-    if (!contract) {
-      return res.status(404).json({ error: 'Contract not found' });
-    }
-
-    // Check if user is authorized to view this contract
-    if (contract.vendor_id !== userId && contract.supplier_id !== userId) {
-      return res.status(403).json({ error: 'Unauthorized to view this contract' });
-    }
-
-    res.json(contract);
-  } catch (error) {
-    console.error('Get contract error:', error);
-    res.status(500).json({ error: 'Failed to get contract' });
-  }
-};
-
-export const signContract = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { contractId } = req.params;
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const contract = await contractService.signContract(parseInt(contractId), userId, userRole);
-    res.json(contract);
-  } catch (error) {
-    console.error('Sign contract error:', error);
-    res.status(500).json({ error: 'Failed to sign contract' });
-  }
-};
-
-export const generateContract = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const contractData = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    // Verify user is authorized to create this contract
-    if (contractData.vendorId !== userId && contractData.supplierId !== userId) {
-      return res.status(403).json({ error: 'Unauthorized to create this contract' });
-    }
-
-    const contract = await contractService.generateContract(contractData);
-    res.json(contract);
-  } catch (error) {
-    console.error('Generate contract error:', error);
-    res.status(500).json({ error: 'Failed to generate contract' });
-  }
-};

@@ -1,59 +1,19 @@
-import express from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth.middleware';
-import {
-  getAllProducts,
-  getProductsForVendor,
-  getSupplierProducts,
-  getProductById,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  restockProduct,
-  updateStock,
-  getLowStockProducts,
-  getCategories,
-  getProductAnalytics
-} from '../controllers/enhanced-product.controller';
+import { Router } from 'express';
+import { EnhancedProductController, createEnhancedProductValidation, updateEnhancedProductValidation } from './enhanced-product.controller';
+import { authenticateToken, requireRole } from '@middleware/auth.middleware';
 
-const router = express.Router();
+const router = Router();
+const enhancedProductController = new EnhancedProductController();
 
-// Public routes
-router.get('/categories', getCategories);
-
-// All other routes require authentication
 router.use(authenticateToken);
 
-// Get all products (with filters)
-router.get('/', getAllProducts);
+// Routes accessible by suppliers (e.g., creating/managing products)
+router.post('/create', requireRole(['supplier']), createEnhancedProductValidation, enhancedProductController.createEnhancedProduct);
+router.put('/:id', requireRole(['supplier']), updateEnhancedProductValidation, enhancedProductController.updateEnhancedProduct);
+router.delete('/:id', requireRole(['supplier']), enhancedProductController.deleteEnhancedProduct);
 
-// Get products for vendor (with supplier info)
-router.get('/vendor', getProductsForVendor);
-
-// Get supplier's own products
-router.get('/supplier', getSupplierProducts);
-
-// Get product analytics (suppliers only)
-router.get('/analytics', getProductAnalytics);
-
-// Get low stock products (suppliers only)
-router.get('/low-stock', getLowStockProducts);
-
-// Get specific product
-router.get('/:productId', getProductById);
-
-// Create new product (suppliers only)
-router.post('/', createProduct);
-
-// Update product (suppliers only)
-router.put('/:productId', updateProduct);
-
-// Delete product (suppliers only)
-router.delete('/:productId', deleteProduct);
-
-// Restock product (suppliers only)
-router.post('/:productId/restock', restockProduct);
-
-// Update stock (suppliers only)
-router.put('/:productId/stock', updateStock);
+// Routes accessible by both vendors and suppliers (e.g., viewing products)
+router.get('/all', requireRole(['vendor', 'supplier']), enhancedProductController.getAllEnhancedProducts);
+router.get('/:id', requireRole(['vendor', 'supplier']), enhancedProductController.getEnhancedProductById);
 
 export default router;

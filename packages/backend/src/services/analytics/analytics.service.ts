@@ -1,8 +1,8 @@
-import { OrderRepository } from '../../database/repositories/order.repository';
-import { PaymentRepository } from '../../database/repositories/payment.repository';
-import { TrustScoreRepository } from '../../database/repositories/trust-score.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
-import { logger } from '../../utils/logger';
+import { OrderRepository } from '@repositories/order.repository';
+import { PaymentRepository } from '@repositories/payment.repository';
+import { TrustScoreRepository } from '@repositories/trust-score.repository';
+import { UserRepository } from '@repositories/user.repository';
+import { logger } from '@utils/logger';
 import { Order, Payment, TrustScore, User, TrustScoreHistory } from '@vendor-supplier/shared/src/types';
 
 export class AnalyticsService {
@@ -37,8 +37,8 @@ export class AnalyticsService {
     logger.info(`Fetching analytics for vendor ${vendorId}`);
     const vendorOrders = await this.orderRepository.findByVendorId(vendorId);
     const totalOrders = vendorOrders.length;
-    const completedOrders = vendorOrders.filter(o => o.status === 'delivered').length;
-    const totalSpending = vendorOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const completedOrders = vendorOrders.filter((o: Order) => o.status === 'delivered').length;
+    const totalSpending = vendorOrders.reduce((sum: number, order: Order) => sum + order.totalAmount, 0);
 
     const trustScore = await this.trustScoreRepository.findByUserId(vendorId);
     const paymentTimeliness = await this.paymentRepository.countOnTimeVendorPayments(vendorId);
@@ -58,8 +58,8 @@ export class AnalyticsService {
     logger.info(`Fetching analytics for supplier ${supplierId}`);
     const supplierOrders = await this.orderRepository.findBySupplierId(supplierId);
     const totalOrders = supplierOrders.length;
-    const completedOrders = supplierOrders.filter(o => o.status === 'delivered').length;
-    const totalEarnings = supplierOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const completedOrders = supplierOrders.filter((o: Order) => o.status === 'delivered').length;
+    const totalEarnings = supplierOrders.reduce((sum: number, order: Order) => sum + order.totalAmount, 0);
 
     const trustScore = await this.trustScoreRepository.findByUserId(supplierId);
     const onTimeDeliveries = await this.orderRepository.countOnTimeSupplierDeliveries(supplierId);
@@ -69,7 +69,7 @@ export class AnalyticsService {
       totalOrders,
       completedOrders,
       totalEarnings,
-      orderCompletionRate: totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0,
+      orderCompletionRate: totalDeliveries > 0 ? (onTimeDeliveries / totalDeliveries) * 100 : 0,
       trustScore: trustScore?.currentScore || 0,
       onTimeDeliveryRate: totalDeliveries > 0 ? (onTimeDeliveries / totalDeliveries) * 100 : 0,
     };

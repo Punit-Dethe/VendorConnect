@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { TrustScoreController } from './trust-score.controller';
-import { TrustScoreService } from './trust-score.service';
-import { TrustScoreRepository } from '../../database/repositories/trust-score.repository';
-import { OrderRepository } from '../../database/repositories/order.repository';
-import { PaymentRepository } from '../../database/repositories/payment.repository';
-import { SupplierRatingRepository } from '../../database/repositories/supplier-rating.repository';
-import { pool } from '../../database/connection';
+import { TrustScoreService } from '@services/trust-score/trust-score.service';
+import { TrustScoreRepository } from '@repositories/trust-score.repository';
+import { OrderRepository } from '@repositories/order.repository';
+import { PaymentRepository } from '@repositories/payment.repository';
+import { SupplierRatingRepository } from '@repositories/supplier-rating.repository';
+import { pool } from '@database/connection';
+import { authenticateToken } from '@middleware/auth.middleware';
 
 const router = Router();
 

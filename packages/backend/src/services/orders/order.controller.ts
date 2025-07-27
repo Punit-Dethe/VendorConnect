@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { OrderService } from './order.service';
-import { ApiResponse } from '../../types/shared';
-import { AppError } from '../../middleware/error.middleware';
-import { OrderRepository } from '../../database/repositories/order.repository';
-import { ProductRepository } from '../../database/repositories/product.repository';
-import { RecurringOrderRepository } from '../../database/repositories/recurring-order.repository';
-import { CreateOrderRequest, UpdateOrderRequest, RecurringOrderConfig } from '@vendor-supplier/shared/src/types';
-import { pool } from '../../database/connection';
+import { ApiResponse } from '@vendor-supplier/shared/src/types';
+import { AppError } from 'src/middleware/error.middleware';
+import { OrderRepository } from '@repositories/order.repository';
+import { ProductRepository } from '@repositories/product.repository';
+import { RecurringOrderRepository } from '@repositories/recurring-order.repository';
+import { CreateOrderRequest, UpdateOrderRequest, RecurringOrder } from '@vendor-supplier/shared/src/types';
+import { pool } from '@database/connection';
 
 export class OrderController {
   private orderService: OrderService;
@@ -226,8 +226,8 @@ export class OrderController {
         throw new AppError('Only vendors can create recurring orders', 403, 'UNAUTHORIZED');
       }
 
-      const recurringOrderData: RecurringOrderConfig = req.body;
-      const recurringOrder = await this.orderService.createRecurringOrder(userId, recurringOrderData);
+      const recurringOrderData: CreateOrderRequest['recurringConfig'] = req.body;
+      const recurringOrder = await this.orderService.createRecurringOrder(userId, recurringOrderData as RecurringOrder);
 
       res.status(201).json({ success: true, data: recurringOrder });
     } catch (error) {
@@ -252,7 +252,7 @@ export class OrderController {
         throw new AppError('Validation failed', 400, 'VALIDATION_ERROR');
       }
       const { id } = req.params;
-      const updateData: Partial<RecurringOrderConfig> = req.body;
+      const updateData: Partial<RecurringOrder> = req.body;
       const updatedRecurringOrder = await this.orderService.updateRecurringOrder(id, updateData);
 
       if (!updatedRecurringOrder) {
@@ -289,7 +289,7 @@ export const createOrderValidation = [
   body('deliveryCity').notEmpty().withMessage('Delivery city is required'),
   body('deliveryPincode').notEmpty().withMessage('Delivery pincode is required'),
   body('orderType').optional().isIn(['one_time', 'recurring']).withMessage('Invalid order type'),
-  body('recurringConfig').optional().custom((value, { req }) => {
+  body('recurringConfig').optional().custom((value: any, { req }) => {
     if (req.body.orderType === 'recurring' && !value) {
       throw new Error('Recurring order configuration is required for recurring orders');
     }

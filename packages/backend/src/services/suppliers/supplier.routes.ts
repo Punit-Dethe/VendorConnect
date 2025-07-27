@@ -1,9 +1,6 @@
 import { Router } from 'express';
-import {
-  SupplierController,
-  searchSuppliersValidation
-} from './supplier.controller';
-import { authenticateToken } from '../../middleware/auth.middleware';
+import { SupplierController, searchSuppliersValidation } from './supplier.controller';
+import { authenticateToken } from '@middleware/auth.middleware';
 
 const router = Router();
 const supplierController = new SupplierController();

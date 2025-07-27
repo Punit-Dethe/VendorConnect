@@ -1,27 +1,19 @@
-import express from 'express';
-import { authenticateToken, requireRole } from '../middleware/auth.middleware';
-import {
-  getContracts,
-  getContractById,
-  signContract,
-  generateContract
-} from '../controllers/contract.controller';
+import { Router } from 'express';
+import { ContractController } from './contract.controller';
+import { authenticateToken, requireRole } from '@middleware/auth.middleware';
 
-const router = express.Router();
+const router = Router();
+const contractController = new ContractController();
 
-// All contract routes require authentication
 router.use(authenticateToken);
 
-// Get all contracts for user
-router.get('/', getContracts);
+// Routes accessible by vendors
+router.post('/create', requireRole(['vendor']), contractController.createContract);
+router.get('/my', requireRole(['vendor', 'supplier']), contractController.getContracts); // Vendors and Suppliers can see their contracts
+router.get('/:id', requireRole(['vendor', 'supplier']), contractController.getContractById);
 
-// Get specific contract
-router.get('/:contractId', getContractById);
-
-// Sign a contract
-router.post('/:contractId/sign', signContract);
-
-// Generate a new contract
-router.post('/generate', generateContract);
+// Routes accessible by suppliers
+router.put('/:id', requireRole(['supplier']), contractController.updateContract); // Only suppliers can update contracts
+router.delete('/:id', requireRole(['supplier']), contractController.deleteContract); // Only suppliers can delete contracts
 
 export default router;

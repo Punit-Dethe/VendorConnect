@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { AnalyticsController } from './analytics.controller';
-import { OrderRepository } from '../../database/repositories/order.repository';
-import { PaymentRepository } from '../../database/repositories/payment.repository';
-import { TrustScoreRepository } from '../../database/repositories/trust-score.repository';
-import { UserRepository } from '../../database/repositories/user.repository';
-import { pool } from '../../database/connection';
-import { authenticateToken } from '../../middleware/auth.middleware';
+import { OrderRepository } from '@repositories/order.repository';
+import { PaymentRepository } from '@repositories/payment.repository';
+import { TrustScoreRepository } from '@repositories/trust-score.repository';
+import { UserRepository } from '@repositories/user.repository';
+import { pool } from '@database/connection';
+import { authenticateToken } from 'src/middleware/auth.middleware';
 
 const router = Router();
 

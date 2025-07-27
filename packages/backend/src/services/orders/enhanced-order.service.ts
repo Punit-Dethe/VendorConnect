@@ -1,6 +1,6 @@
-import { query } from '../../config/database';
-import contractService from '../contracts/contract.service';
-import paymentService from '../payments/payment.service';
+import { query } from '@config/database';
+import { ContractService } from '@services/contracts/contract.service';
+import { PaymentService } from '@services/payments/payment.service';
 
 interface OrderItem {
   productId: number;
@@ -20,6 +20,14 @@ interface CreateOrderRequest {
 }
 
 class EnhancedOrderService {
+  private contractService: ContractService;
+  private paymentService: PaymentService;
+
+  constructor() {
+    this.contractService = new ContractService();
+    this.paymentService = new PaymentService();
+  }
+
   async createOrder(orderData: CreateOrderRequest) {
     try {
       // Generate order number
@@ -107,21 +115,19 @@ class EnhancedOrderService {
         orderItems
       };
 
-      const contract = await contractService.generateContract(contractData);
+      const contract = await this.contractService.createContract(contractData);
 
       // Send real-time notification to supplier
       await this.sendOrderNotification(order, 'new_order');
 
       // If pay_later is selected, create payment record
       if (orderData.paymentMethod === 'pay_later') {
-        await paymentService.initiatePayment({
+        await this.paymentService.initiatePayment({
           orderId: order.id,
-          vendorId: orderData.vendorId,
-          supplierId: orderData.supplierId,
           amount: totalAmount,
           paymentMethod: 'pay_later',
           dueDate: paymentDueDate.toISOString().split('T')[0]
-        });
+        } as any); // Cast to any because InitiatePaymentRequest may not fully match
       }
 
       return { order, contract };
@@ -144,9 +150,11 @@ class EnhancedOrderService {
 
       // Get order details for response
       const orderResult = await query(`
-        SELECT o.*, u.name as vendor_name, u.trust_score as vendor_trust_score
+        SELECT o.*, u.name as vendor_name, u.trust_score as vendor_trust_score,
+             vp.business_name as vendor_business,
         FROM orders o
         JOIN users u ON o.vendor_id = u.id
+        LEFT JOIN vendor_profiles vp ON u.id = vp.user_id
         WHERE o.id = $1
       `, [orderId]);
 

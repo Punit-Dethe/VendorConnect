@@ -1,102 +1,78 @@
-import { Request, Response } from 'express';
-import paymentService from '../services/payments/payment.service';
+import { Request, Response, NextFunction } from 'express';
+import { PaymentService } from '../services/payments/payment.service';
+import { AppError } from '../middleware/error.middleware';
+import { ApiResponse, InitiatePaymentRequest, Payment } from '@vendor-supplier/shared/src/types';
+import { validationResult } from 'express-validator';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    mobile: string;
-    name: string;
-    email?: string;
-    role: 'vendor' | 'supplier';
-    trust_score: number;
-    is_verified: boolean;
+export class PaymentController {
+  private paymentService: PaymentService;
+
+  constructor() {
+    this.paymentService = new PaymentService();
+  }
+
+  initiatePayment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR'));
+      }
+
+      const paymentData: InitiatePaymentRequest = req.body;
+      const newPayment = await this.paymentService.initiatePayment(paymentData);
+      const response: ApiResponse<Payment> = { success: true, data: newPayment };
+      res.status(201).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  processPaymentCallback = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // This endpoint would typically be hit by a payment gateway webhook.
+      // Security: Validate webhook signature/IP to ensure it's from the legitimate gateway.
+      const callbackData = req.body;
+      const updatedPayment = await this.paymentService.processPaymentCallback(callbackData);
+      const response: ApiResponse<Payment> = { success: true, data: updatedPayment };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getPaymentStatus = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const payment = await this.paymentService.getPaymentById(id);
+      if (!payment) {
+        return next(new AppError('Payment not found', 404, 'NOT_FOUND'));
+      }
+      const response: ApiResponse<Payment> = { success: true, data: payment };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getPaymentsForOrder = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { orderId } = req.params;
+      const payments = await this.paymentService.getPaymentsByOrderId(orderId);
+      const response: ApiResponse<Payment[]> = { success: true, data: payments };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  refundPayment = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { amount } = req.body; // Optional: specify amount to refund
+      const refundedPayment = await this.paymentService.refundPayment(id, amount);
+      res.status(200).json({ success: true, data: refundedPayment, message: 'Payment refunded successfully' } as ApiResponse<Payment>); // Cast to ApiResponse<Payment> due to 'message' property.
+    } catch (error) {
+      next(error);
+    }
   };
 }
-
-export const initiatePayment = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { orderId, amount, paymentMethod, dueDate } = req.body;
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-
-    if (!userId || userRole !== 'vendor') {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    // Get order details to verify vendor ownership
-    const orderResult = await paymentService.getPaymentHistory(userId, 'vendor');
-    const order = orderResult.find(p => p.order_id === orderId);
-
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-
-    const paymentRequest = {
-      orderId,
-      vendorId: userId,
-      supplierId: order.supplier_id,
-      amount,
-      paymentMethod,
-      dueDate
-    };
-
-    const result = await paymentService.initiatePayment(paymentRequest);
-
-    res.json(result);
-  } catch (error) {
-    console.error('Payment initiation error:', error);
-    res.status(500).json({ error: 'Failed to initiate payment' });
-  }
-};
-
-export const getPaymentHistory = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const payments = await paymentService.getPaymentHistory(userId, userRole);
-    res.json(payments);
-  } catch (error) {
-    console.error('Get payment history error:', error);
-    res.status(500).json({ error: 'Failed to get payment history' });
-  }
-};
-
-export const getPendingPayments = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const userRole = req.user?.role;
-
-    if (!userId || userRole !== 'supplier') {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const pendingPayments = await paymentService.getPendingPayments(userId);
-    res.json(pendingPayments);
-  } catch (error) {
-    console.error('Get pending payments error:', error);
-    res.status(500).json({ error: 'Failed to get pending payments' });
-  }
-};
-
-export const updatePaymentStatus = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { paymentId } = req.params;
-    const { status } = req.body;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    await paymentService.updatePaymentStatus(parseInt(paymentId), status);
-    res.json({ success: true, message: 'Payment status updated' });
-  } catch (error) {
-    console.error('Update payment status error:', error);
-    res.status(500).json({ error: 'Failed to update payment status' });
-  }
-};

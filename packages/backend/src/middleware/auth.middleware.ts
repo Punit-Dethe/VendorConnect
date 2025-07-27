@@ -1,15 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../config/jwt';
-import { AppError } from './error.middleware';
-import { UserRepository } from '../database/repositories/user.repository';
-import { pool } from '../database/connection';
-import asyncHandler from '../utils/asyncHandler';
-import { User } from '@vendor-supplier/shared/src/types'; // Import User type
+import { verifyToken } from '@config/jwt';
+import { AppError } from '@middleware/error.middleware';
+import { UserRepository } from '@repositories/user.repository';
+import { pool } from '@database/connection';
+import asyncHandler from '@utils/asyncHandler';
+import { User } from '@vendor-supplier/shared/src/types';
 
 declare global {
   namespace Express {
     interface Request {
-      user?: User; // Directly use the User type for req.user
+      user?: User;
     }
   }
 }

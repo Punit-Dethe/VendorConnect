@@ -1,123 +1,71 @@
-import { Request, Response } from 'express';
-import notificationService from '../services/notifications/notification.service';
+import { Request, Response, NextFunction } from 'express';
+import { NotificationService } from '../services/notifications/notification.service';
+import { AppError } from '../middleware/error.middleware';
+import { ApiResponse, Notification } from '@vendor-supplier/shared/src/types';
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    mobile: string;
-    name: string;
-    email?: string;
-    role: 'vendor' | 'supplier';
-    trust_score: number;
-    is_verified: boolean;
+export class NotificationController {
+  private notificationService: NotificationService;
+
+  constructor() {
+    this.notificationService = new NotificationService();
+  }
+
+  getNotifications = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = (req as any).user?.id; // Assuming user ID is available from authentication middleware
+      if (!userId) {
+        return next(new AppError('User not authenticated', 401, 'UNAUTHORIZED'));
+      }
+      const notifications = await this.notificationService.getNotificationsByUserId(userId);
+      const response: ApiResponse<Notification[]> = { success: true, data: notifications };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  markNotificationAsRead = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return next(new AppError('User not authenticated', 401, 'UNAUTHORIZED'));
+      }
+      const updatedNotification = await this.notificationService.markAsRead(id, userId);
+      if (!updatedNotification) {
+        return next(new AppError('Notification not found or update failed', 404, 'UPDATE_FAILED'));
+      }
+      const response: ApiResponse<Notification> = { success: true, data: updatedNotification };
+      res.status(200).json(response);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteNotification = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return next(new AppError('User not authenticated', 401, 'UNAUTHORIZED'));
+      }
+      await this.notificationService.deleteNotification(id, userId);
+      res.status(200).json({ success: true, data: { message: 'Notification deleted successfully' } });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  clearAllNotifications = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        return next(new AppError('User not authenticated', 401, 'UNAUTHORIZED'));
+      }
+      await this.notificationService.clearAllNotifications(userId);
+      res.status(200).json({ success: true, data: { message: 'All notifications cleared successfully' } });
+    } catch (error) {
+      next(error);
+    }
   };
 }
-
-export const getNotifications = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-    const limit = parseInt(req.query.limit as string) || 50;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const notifications = await notificationService.getUserNotifications(userId, limit);
-    res.json(notifications);
-  } catch (error) {
-    console.error('Get notifications error:', error);
-    res.status(500).json({ error: 'Failed to get notifications' });
-  }
-};
-
-export const getUnreadNotifications = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const notifications = await notificationService.getUnreadNotifications(userId);
-    res.json(notifications);
-  } catch (error) {
-    console.error('Get unread notifications error:', error);
-    res.status(500).json({ error: 'Failed to get unread notifications' });
-  }
-};
-
-export const getNotificationCount = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const count = await notificationService.getNotificationCount(userId);
-    res.json(count);
-  } catch (error) {
-    console.error('Get notification count error:', error);
-    res.status(500).json({ error: 'Failed to get notification count' });
-  }
-};
-
-export const markAsRead = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { notificationId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const success = await notificationService.markAsRead(parseInt(notificationId), userId);
-
-    if (success) {
-      res.json({ success: true, message: 'Notification marked as read' });
-    } else {
-      res.status(404).json({ error: 'Notification not found' });
-    }
-  } catch (error) {
-    console.error('Mark as read error:', error);
-    res.status(500).json({ error: 'Failed to mark notification as read' });
-  }
-};
-
-export const markAllAsRead = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const count = await notificationService.markAllAsRead(userId);
-    res.json({ success: true, message: `${count} notifications marked as read` });
-  } catch (error) {
-    console.error('Mark all as read error:', error);
-    res.status(500).json({ error: 'Failed to mark all notifications as read' });
-  }
-};
-
-export const deleteNotification = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { notificationId } = req.params;
-    const userId = req.user?.id;
-
-    if (!userId) {
-      return res.status(403).json({ error: 'Unauthorized' });
-    }
-
-    const success = await notificationService.deleteNotification(parseInt(notificationId), userId);
-
-    if (success) {
-      res.json({ success: true, message: 'Notification deleted' });
-    } else {
-      res.status(404).json({ error: 'Notification not found' });
-    }
-  } catch (error) {
-    console.error('Delete notification error:', error);
-    res.status(500).json({ error: 'Failed to delete notification' });
-  }
-};
