@@ -1,7 +1,19 @@
 import { Request, Response } from 'express';
 import notificationService from '../services/notifications/notification.service';
 
-export const getNotifications = async (req: Request, res: Response) => {
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    mobile: string;
+    name: string;
+    email?: string;
+    role: 'vendor' | 'supplier';
+    trust_score: number;
+    is_verified: boolean;
+  };
+}
+
+export const getNotifications = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const limit = parseInt(req.query.limit as string) || 50;
@@ -18,7 +30,7 @@ export const getNotifications = async (req: Request, res: Response) => {
   }
 };
 
-export const getUnreadNotifications = async (req: Request, res: Response) => {
+export const getUnreadNotifications = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -34,7 +46,7 @@ export const getUnreadNotifications = async (req: Request, res: Response) => {
   }
 };
 
-export const getNotificationCount = async (req: Request, res: Response) => {
+export const getNotificationCount = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -50,7 +62,7 @@ export const getNotificationCount = async (req: Request, res: Response) => {
   }
 };
 
-export const markAsRead = async (req: Request, res: Response) => {
+export const markAsRead = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { notificationId } = req.params;
     const userId = req.user?.id;
@@ -72,7 +84,7 @@ export const markAsRead = async (req: Request, res: Response) => {
   }
 };
 
-export const markAllAsRead = async (req: Request, res: Response) => {
+export const markAllAsRead = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
 
@@ -88,7 +100,7 @@ export const markAllAsRead = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteNotification = async (req: Request, res: Response) => {
+export const deleteNotification = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { notificationId } = req.params;
     const userId = req.user?.id;

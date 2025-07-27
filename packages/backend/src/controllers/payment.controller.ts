@@ -1,7 +1,19 @@
 import { Request, Response } from 'express';
 import paymentService from '../services/payments/payment.service';
 
-export const initiatePayment = async (req: Request, res: Response) => {
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    mobile: string;
+    name: string;
+    email?: string;
+    role: 'vendor' | 'supplier';
+    trust_score: number;
+    is_verified: boolean;
+  };
+}
+
+export const initiatePayment = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orderId, amount, paymentMethod, dueDate } = req.body;
     const userId = req.user?.id;
@@ -37,7 +49,7 @@ export const initiatePayment = async (req: Request, res: Response) => {
   }
 };
 
-export const getPaymentHistory = async (req: Request, res: Response) => {
+export const getPaymentHistory = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -54,7 +66,7 @@ export const getPaymentHistory = async (req: Request, res: Response) => {
   }
 };
 
-export const getPendingPayments = async (req: Request, res: Response) => {
+export const getPendingPayments = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -71,7 +83,7 @@ export const getPendingPayments = async (req: Request, res: Response) => {
   }
 };
 
-export const updatePaymentStatus = async (req: Request, res: Response) => {
+export const updatePaymentStatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { paymentId } = req.params;
     const { status } = req.body;

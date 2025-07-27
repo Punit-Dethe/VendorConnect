@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { generateToken, generateRefreshToken } from '../../config/jwt';
 import { AppError } from '../../middleware/error.middleware';
-import { UserRegistration, UserLogin, AuthResponse, User } from '@vendor-supplier/shared';
+import { UserRegistration, UserLogin, AuthResponse, User } from '../../types/shared';
 
 // In-memory storage for mock data (replace with database in production)
 interface StoredUser {

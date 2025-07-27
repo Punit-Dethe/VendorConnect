@@ -2,10 +2,19 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../config/jwt';
 import { AppError } from './error.middleware';
 
-// Import the extended Request type
-import '../types/express';
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    mobile: string;
+    name: string;
+    email?: string;
+    role: 'vendor' | 'supplier';
+    trust_score: number;
+    is_verified: boolean;
+  };
+}
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -15,7 +24,16 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 
   try {
     const decoded = verifyToken(token);
-    req.user = decoded;
+    // Use the token data directly for now
+    req.user = {
+      id: parseInt(decoded.userId.replace(/\D/g, '')) || 1, // Extract number from userId
+      mobile: decoded.mobile,
+      name: decoded.mobile, // Use mobile as name for now
+      email: undefined,
+      role: decoded.role,
+      trust_score: 75, // Default trust score
+      is_verified: true
+    };
     next();
   } catch (error) {
     throw new AppError('Invalid or expired token', 401, 'UNAUTHORIZED');
@@ -23,7 +41,7 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
 };
 
 export const requireRole = (allowedRoles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     const user = req.user;
 
     if (!user) {

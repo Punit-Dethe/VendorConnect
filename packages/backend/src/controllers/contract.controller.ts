@@ -1,7 +1,19 @@
 import { Request, Response } from 'express';
 import contractService from '../services/contracts/contract.service';
 
-export const getContracts = async (req: Request, res: Response) => {
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    mobile: string;
+    name: string;
+    email?: string;
+    role: 'vendor' | 'supplier';
+    trust_score: number;
+    is_verified: boolean;
+  };
+}
+
+export const getContracts = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -18,7 +30,7 @@ export const getContracts = async (req: Request, res: Response) => {
   }
 };
 
-export const getContractById = async (req: Request, res: Response) => {
+export const getContractById = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { contractId } = req.params;
     const userId = req.user?.id;
@@ -45,7 +57,7 @@ export const getContractById = async (req: Request, res: Response) => {
   }
 };
 
-export const signContract = async (req: Request, res: Response) => {
+export const signContract = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { contractId } = req.params;
     const userId = req.user?.id;
@@ -63,7 +75,7 @@ export const signContract = async (req: Request, res: Response) => {
   }
 };
 
-export const generateContract = async (req: Request, res: Response) => {
+export const generateContract = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const contractData = req.body;
     const userId = req.user?.id;

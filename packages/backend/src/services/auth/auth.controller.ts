@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { AuthService } from './auth.service';
-import { ApiResponse, UserRegistration, UserLogin } from '@vendor-supplier/shared';
+import { ApiResponse, UserRegistration, UserLogin } from '../../types/shared';
 import { AppError } from '../../middleware/error.middleware';
 
 export class AuthController {

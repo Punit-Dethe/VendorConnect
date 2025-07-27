@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
 import { OrderService, CreateOrderData, UpdateOrderStatusData } from './order.service';
-import { ApiResponse } from '@vendor-supplier/shared';
+import { ApiResponse } from '../../types/shared';
 import { AppError } from '../../middleware/error.middleware';
 
 export class OrderController {

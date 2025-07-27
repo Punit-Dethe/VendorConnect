@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { ApiResponse } from '@vendor-supplier/shared';
+import { ApiResponse } from '../types/shared';
 
 export class AppError extends Error {
   public statusCode: number;

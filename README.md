@@ -1,283 +1,264 @@
-# VendorConnect - Digital Marketplace for Street Food Vendors
+# 🇮🇳 VendorConnect - Street Food Vendor & Supplier Platform
 
-A comprehensive digital marketplace designed to streamline the supply chain for India's street food vendors. The platform connects small food vendors with raw material suppliers through a trust-based system, digital contracts, and automated matching algorithms.
+A comprehensive platform connecting street food vendors with suppliers in India, featuring real-time order management, digital contracts, payment gateway integration, and trust-based transactions.
 
-## 🚀 Features
+## 🌟 Features
 
-### For Vendors
-- **Smart Supplier Matching**: Auto-match with trusted suppliers based on location, availability, and trust scores
-- **Order Management**: Place one-time or recurring orders with real-time tracking
-- **Trust-Based Selection**: View supplier TrustScores and make informed decisions
-- **Digital Contracts**: Secure agreements with clear terms and payment guarantees
-- **Payment Integration**: UPI payments and invoice upload support
-- **Real-time Chat**: Communicate directly with suppliers
+### ✅ **Complete Feature Set**
+- **Payment Gateway Integration** - UPI, Card, Net Banking, Wallet, Pay Later
+- **Real-Time Order Management** - Instant notifications and approvals
+- **Digital Contract System** - Auto-generated legal agreements
+- **Trust Score System** - Reliability tracking for all users
+- **Advanced Product Management** - Real-time inventory with low stock alerts
+- **Notification System** - Real-time updates for all activities
+- **Multi-Role Authentication** - Separate interfaces for vendors and suppliers
 
-### For Suppliers
-- **Inventory Management**: Manage products, pricing, and stock levels
-- **Order Processing**: Accept/decline orders and manage delivery schedules
-- **Trust Building**: Build reputation through reliable service and quality
-- **Analytics Dashboard**: Track performance, revenue, and customer satisfaction
-- **Low Stock Alerts**: Automated notifications for inventory management
+### 🎯 **For Vendors (Street Food Sellers)**
+- Browse suppliers by region and trust score
+- Smart product recommendations
+- Shopping cart with multiple payment options
+- Real-time order tracking
+- Digital contract signing
+- Payment history and management
+- Recurring order setup
 
-### Platform Features
-- **TrustScore System**: Transparent scoring based on reliability, quality, and performance
-- **Real-time Notifications**: SMS, email, and in-app notifications
-- **Mobile-First Design**: Responsive design optimized for mobile devices
-- **Secure Authentication**: JWT-based authentication with role-based access
-- **Data Analytics**: Comprehensive reporting and insights
-
-## 🏗️ Architecture
-
-### Technology Stack
-- **Frontend**: React.js with TypeScript, Redux Toolkit, Tailwind CSS
-- **Backend**: Node.js with Express.js, TypeScript
-- **Database**: PostgreSQL with Redis for caching
-- **Authentication**: JWT tokens with refresh mechanism
-- **Real-time**: Socket.io for chat and notifications
-- **Deployment**: Docker containers with Docker Compose
-
-### Project Structure
-```
-vendor-supplier-platform/
-├── packages/
-│   ├── shared/          # Shared types, constants, and utilities
-│   ├── backend/         # Node.js API server
-│   └── frontend/        # React.js web application
-├── docker-compose.yml   # Development environment setup
-└── README.md
-```
+### 🏪 **For Suppliers (Wholesalers)**
+- Real-time order requests with vendor trust scores
+- Order approval/rejection system
+- Complete product inventory management
+- Stock level monitoring and alerts
+- Payment tracking with flexible terms
+- Digital contract management
+- Business analytics dashboard
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 18+ and npm
-- Docker and Docker Compose (recommended)
-- PostgreSQL (if running locally)
-- Redis (if running locally)
+- Node.js (v16 or higher)
+- PostgreSQL (v12 or higher)
+- npm or yarn
 
-### Development Setup
+### 1. Clone & Install
+```bash
+git clone <repository-url>
+cd VendorConnect
+npm install
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd vendor-supplier-platform
-   ```
+### 2. Database Setup
+```bash
+# Create PostgreSQL database
+createdb vendor_supplier_db
 
-2. **Run the setup script**
-   ```bash
-   npm run setup
-   ```
-   
-   This will:
-   - Install all dependencies
-   - Build the shared package
-   - Create environment files
-   - Set up the project structure
+# Initialize database with schema
+cd packages/backend
+node scripts/init-db.js
+```
 
-3. **Start with Docker (Recommended)**
-   ```bash
-   docker-compose up -d
-   ```
-   
-   This will start:
-   - PostgreSQL database on port 5432
-   - Redis cache on port 6379
-   - Backend API on port 5000
-   - Frontend app on port 3000
+### 3. Environment Configuration
+Create `.env` files in both frontend and backend directories:
 
-4. **Or start manually**
-   ```bash
-   # Start databases first (if not using Docker)
-   # PostgreSQL on port 5432
-   # Redis on port 6379
-   
-   # Terminal 1 - Backend
-   cd packages/backend
-   npm run dev
-   
-   # Terminal 2 - Frontend
-   cd packages/frontend
-   npm run dev
-   ```
-
-5. **Access the application**
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-   - API Health: http://localhost:5000/health
-
-### Troubleshooting
-
-#### Common Issues
-
-1. **"Cannot find module '@vendor-supplier/shared'"**
-   ```bash
-   cd packages/shared
-   npm run build
-   cd ../frontend
-   npm install
-   ```
-
-2. **CSS/Tailwind errors**
-   ```bash
-   cd packages/frontend
-   npm install tailwindcss postcss autoprefixer
-   ```
-
-3. **Database connection errors**
-   - Ensure PostgreSQL is running on port 5432
-   - Check database credentials in `.env` file
-   - Run: `docker-compose up postgres -d`
-
-4. **Port already in use**
-   ```bash
-   # Kill processes on ports
-   npx kill-port 3000 5000
-   ```
-
-5. **Module resolution errors**
-   ```bash
-   # Clean install
-   rm -rf node_modules packages/*/node_modules
-   npm run setup
-   ```
-
-### Environment Variables
-
-Create `.env` files in the backend package:
-
+**Backend (.env):**
 ```env
-# Database
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=vendor_supplier_db
 DB_USER=postgres
-DB_PASSWORD=password
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# JWT
-JWT_SECRET=your-super-secret-jwt-key
-JWT_REFRESH_SECRET=your-super-secret-refresh-key
-JWT_EXPIRES_IN=24h
-JWT_REFRESH_EXPIRES_IN=7d
-
-# Server
+DB_PASSWORD=your_password
+JWT_SECRET=your_jwt_secret
 PORT=5000
-NODE_ENV=development
-FRONTEND_URL=http://localhost:3000
 ```
 
-## 📱 Usage
+**Frontend (.env):**
+```env
+REACT_APP_API_URL=http://localhost:5000
+```
 
-### Getting Started
-
-1. **Visit the landing page** at http://localhost:3000
-2. **Choose your role**: Vendor or Supplier
-3. **Register** with your business details
-4. **Complete your profile** and start using the platform
-
-### For Vendors
-1. Browse suppliers and products
-2. Place orders (one-time or recurring)
-3. Track order status in real-time
-4. Make payments via UPI or invoice upload
-5. Rate and review suppliers
-
-### For Suppliers
-1. Add your products and set pricing
-2. Manage inventory and stock levels
-3. Accept/decline order requests
-4. Create digital contracts
-5. Track payments and analytics
-
-## 🧪 Testing
-
+### 4. Start the Application
 ```bash
-# Run all tests
-npm test
+# Start both frontend and backend
+npm run dev
 
-# Run backend tests
-npm run test:backend
-
-# Run frontend tests
-npm run test:frontend
-
-# Run tests in watch mode
-npm run test:watch
+# Or start individually:
+# Backend: cd packages/backend && npm run dev
+# Frontend: cd packages/frontend && npm run dev
 ```
+
+### 5. Access the Platform
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:5000
+
+## 🔐 Test Credentials
+
+### Vendor Account
+- **Mobile**: 9876543210
+- **Password**: password123
+
+### Supplier Account
+- **Mobile**: 9876543211
+- **Password**: password123
+
+## 📱 User Journey
+
+### **Vendor Workflow**
+1. **Login** → Modern dashboard with supplier recommendations
+2. **Browse Suppliers** → Filter by region, category, trust score
+3. **View Products** → Real-time stock levels and pricing
+4. **Add to Cart** → Multiple items from same supplier
+5. **Checkout** → Choose payment method (including pay later)
+6. **Digital Contract** → Auto-generated, both parties sign
+7. **Order Tracking** → Real-time status updates
+8. **Payment** → Flexible terms as per contract
+
+### **Supplier Workflow**
+1. **Login** → Professional business dashboard
+2. **Manage Products** → Add, update, restock inventory
+3. **Receive Orders** → Real-time notifications with vendor trust scores
+4. **Review & Approve** → Assess vendor reliability before approval
+5. **Digital Contract** → Review and sign generated contracts
+6. **Track Payments** → Monitor due dates and payment status
+7. **Analytics** → Business insights and performance metrics
+
+## 🛠 Technical Architecture
+
+### **Backend Stack**
+- **Node.js + Express** - RESTful API server
+- **PostgreSQL** - Primary database with full ACID compliance
+- **JWT Authentication** - Secure token-based auth
+- **Real-time Notifications** - Event-driven architecture
+- **Payment Integration** - Mock Razorpay gateway (production-ready)
+
+### **Frontend Stack**
+- **React + TypeScript** - Modern UI with type safety
+- **Tailwind CSS** - Utility-first styling with custom components
+- **Redux Toolkit** - State management
+- **React Router** - Client-side routing
+- **Responsive Design** - Mobile-first approach
+
+### **Key APIs**
+
+#### **Enhanced Product Management**
+```
+GET    /api/v2/products              # Get all products with filters
+GET    /api/v2/products/vendor       # Get products for vendor
+GET    /api/v2/products/supplier     # Get supplier's products
+POST   /api/v2/products              # Create new product
+PUT    /api/v2/products/:id          # Update product
+POST   /api/v2/products/:id/restock  # Restock product
+```
+
+#### **Advanced Order Management**
+```
+POST   /api/v2/orders                # Create order with contract
+GET    /api/v2/orders/vendor         # Get vendor orders
+GET    /api/v2/orders/supplier       # Get supplier orders
+POST   /api/v2/orders/:id/approve    # Approve order
+POST   /api/v2/orders/:id/reject     # Reject order
+```
+
+#### **Payment System**
+```
+POST   /api/payments/initiate        # Initiate payment
+GET    /api/payments/history         # Payment history
+GET    /api/payments/pending         # Pending payments
+```
+
+#### **Digital Contracts**
+```
+GET    /api/contracts                # Get user contracts
+GET    /api/contracts/:id            # Get specific contract
+POST   /api/contracts/:id/sign       # Sign contract
+```
+
+#### **Notifications**
+```
+GET    /api/notifications            # Get notifications
+GET    /api/notifications/unread     # Get unread notifications
+PUT    /api/notifications/:id/read   # Mark as read
+```
+
+## 🎨 Modern UI Features
+
+### **Design System**
+- **Glassmorphism Effects** - Modern backdrop blur and transparency
+- **Gradient Designs** - Beautiful color gradients throughout
+- **Smooth Animations** - Hover effects and transitions
+- **Enhanced Typography** - Improved font weights and spacing
+- **Contextual Icons** - Meaningful icons with better styling
+- **Visual Hierarchy** - Clear information architecture
+
+### **User Experience**
+- **Vendor Interface** - Customer-like, intuitive shopping experience
+- **Supplier Interface** - Professional business dashboard
+- **Responsive Design** - Works perfectly on all devices
+- **Real-time Updates** - Live notifications and status changes
+- **Visual Feedback** - Clear indicators for all interactions
+
+## 🔒 Security Features
+
+- **JWT Authentication** - Secure token-based authentication
+- **Role-based Access** - Separate permissions for vendors and suppliers
+- **Input Validation** - Comprehensive data validation
+- **SQL Injection Protection** - Parameterized queries
+- **Trust Score System** - Fraud prevention through reputation
+- **Digital Signatures** - Contract authenticity verification
+
+## 📊 Database Schema
+
+### **Core Tables**
+- `users` - User authentication and basic info
+- `vendor_profiles` - Vendor-specific information
+- `supplier_profiles` - Supplier business details
+- `products` - Product catalog with real-time stock
+- `orders` - Order management with status tracking
+- `contracts` - Digital agreements with signatures
+- `payments` - Payment tracking and history
+- `notifications` - Real-time notification system
 
 ## 🚀 Deployment
 
-### Production Build
-```bash
-npm run build
-```
+### **Production Setup**
+1. Set up PostgreSQL database
+2. Configure environment variables
+3. Build frontend: `npm run build`
+4. Deploy backend to your server
+5. Set up reverse proxy (nginx)
+6. Configure SSL certificates
 
-### Docker Production
-```bash
-docker-compose -f docker-compose.prod.yml up -d
+### **Environment Variables**
+```env
+# Database
+DB_HOST=your_db_host
+DB_NAME=vendor_supplier_db
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+
+# JWT
+JWT_SECRET=your_strong_jwt_secret
+
+# Payment Gateway
+RAZORPAY_KEY_ID=your_razorpay_key
+RAZORPAY_KEY_SECRET=your_razorpay_secret
 ```
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
+2. Create feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
-## 📄 API Documentation
-
-### Authentication Endpoints
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/profile` - Get user profile
-- `POST /api/auth/refresh-token` - Refresh JWT token
-
-### Order Management
-- `GET /api/orders` - Get user orders
-- `POST /api/orders` - Create new order
-- `GET /api/orders/:id` - Get order details
-- `PUT /api/orders/:id/status` - Update order status
-
-### Product Management
-- `GET /api/products` - Get products
-- `POST /api/products` - Create product (suppliers only)
-- `PUT /api/products/:id` - Update product
-- `GET /api/categories` - Get product categories
-
-## 🔒 Security
-
-- JWT-based authentication with refresh tokens
-- Password hashing with bcrypt
-- Input validation and sanitization
-- Rate limiting on API endpoints
-- CORS protection
-- Helmet.js security headers
-
-## 📊 Monitoring
-
-- Application performance monitoring
-- Error tracking and logging
-- Business metrics dashboards
-- Real-time notifications
-- Database query optimization
-
-## 📞 Support
-
-For support, email support@vendorconnect.com or join our Slack channel.
-
-## 📝 License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Built for India's street food vendor community
-- Inspired by the need for supply chain digitization
-- Thanks to all contributors and testers
+- Built for the Indian street food vendor community
+- Designed to bridge the gap between vendors and suppliers
+- Focused on trust, transparency, and efficiency
 
 ---
 
-**VendorConnect** - Connecting street food vendors with trusted suppliers across India. 🇮🇳
+**VendorConnect** - Empowering India's Street Food Economy 🇮🇳✨

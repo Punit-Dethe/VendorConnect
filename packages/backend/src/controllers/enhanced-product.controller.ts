@@ -1,8 +1,20 @@
 import { Request, Response } from 'express';
 import enhancedProductService from '../services/products/enhanced-product.service';
-import '../types/express';
 
-export const getAllProducts = async (req: Request, res: Response) => {
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    mobile: string;
+    name: string;
+    email?: string;
+    role: 'vendor' | 'supplier';
+    trust_score: number;
+    is_verified: boolean;
+  };
+}
+
+
+export const getAllProducts = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const filters = req.query;
     const products = await enhancedProductService.getAllProducts(filters);
@@ -13,7 +25,7 @@ export const getAllProducts = async (req: Request, res: Response) => {
   }
 };
 
-export const getProductsForVendor = async (req: Request, res: Response) => {
+export const getProductsForVendor = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -31,7 +43,7 @@ export const getProductsForVendor = async (req: Request, res: Response) => {
   }
 };
 
-export const getSupplierProducts = async (req: Request, res: Response) => {
+export const getSupplierProducts = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -48,10 +60,10 @@ export const getSupplierProducts = async (req: Request, res: Response) => {
   }
 };
 
-export const getProductById = async (req: Request, res: Response) => {
+export const getProductById = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { productId } = req.params;
-    const product = await enhancedProductService.getProductById(parseInt(productId));
+    const product = await enhancedProductService.getProductById(productId);
 
     if (!product) {
       return res.status(404).json({ error: 'Product not found' });
@@ -64,7 +76,7 @@ export const getProductById = async (req: Request, res: Response) => {
   }
 };
 
-export const createProduct = async (req: Request, res: Response) => {
+export const createProduct = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const productData = req.body;
     const userId = req.user?.id;
@@ -82,7 +94,7 @@ export const createProduct = async (req: Request, res: Response) => {
   }
 };
 
-export const updateProduct = async (req: Request, res: Response) => {
+export const updateProduct = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { productId } = req.params;
     const updateData = req.body;
@@ -93,7 +105,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const product = await enhancedProductService.updateProduct(parseInt(productId), userId, updateData);
+    const product = await enhancedProductService.updateProduct(productId, userId, updateData);
     res.json(product);
   } catch (error) {
     console.error('Update product error:', error);
@@ -101,7 +113,7 @@ export const updateProduct = async (req: Request, res: Response) => {
   }
 };
 
-export const deleteProduct = async (req: Request, res: Response) => {
+export const deleteProduct = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { productId } = req.params;
     const userId = req.user?.id;
@@ -111,7 +123,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    await enhancedProductService.deleteProduct(parseInt(productId), userId);
+    await enhancedProductService.deleteProduct(productId, userId);
     res.json({ success: true, message: 'Product deleted successfully' });
   } catch (error) {
     console.error('Delete product error:', error);
@@ -119,7 +131,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
   }
 };
 
-export const restockProduct = async (req: Request, res: Response) => {
+export const restockProduct = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { productId } = req.params;
     const { additionalStock } = req.body;
@@ -130,7 +142,7 @@ export const restockProduct = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const product = await enhancedProductService.restockProduct(parseInt(productId), userId, additionalStock);
+    const product = await enhancedProductService.restockProduct(productId, userId, additionalStock);
     res.json(product);
   } catch (error) {
     console.error('Restock product error:', error);
@@ -138,7 +150,7 @@ export const restockProduct = async (req: Request, res: Response) => {
   }
 };
 
-export const updateStock = async (req: Request, res: Response) => {
+export const updateStock = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { productId } = req.params;
     const { newStock } = req.body;
@@ -149,7 +161,7 @@ export const updateStock = async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    const product = await enhancedProductService.updateStock(parseInt(productId), userId, newStock);
+    const product = await enhancedProductService.updateStock(productId, userId, newStock);
     res.json(product);
   } catch (error) {
     console.error('Update stock error:', error);
@@ -157,7 +169,7 @@ export const updateStock = async (req: Request, res: Response) => {
   }
 };
 
-export const getLowStockProducts = async (req: Request, res: Response) => {
+export const getLowStockProducts = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -174,7 +186,7 @@ export const getLowStockProducts = async (req: Request, res: Response) => {
   }
 };
 
-export const getCategories = async (req: Request, res: Response) => {
+export const getCategories = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const categories = await enhancedProductService.getCategories();
     res.json(categories);
@@ -184,7 +196,7 @@ export const getCategories = async (req: Request, res: Response) => {
   }
 };
 
-export const getProductAnalytics = async (req: Request, res: Response) => {
+export const getProductAnalytics = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;

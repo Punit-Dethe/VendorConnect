@@ -1,7 +1,19 @@
 import { Request, Response } from 'express';
 import enhancedOrderService from '../services/orders/enhanced-order.service';
 
-export const createOrder = async (req: Request, res: Response) => {
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    mobile: string;
+    name: string;
+    email?: string;
+    role: 'vendor' | 'supplier';
+    trust_score: number;
+    is_verified: boolean;
+  };
+}
+
+export const createOrder = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const orderData = req.body;
     const userId = req.user?.id;
@@ -21,7 +33,7 @@ export const createOrder = async (req: Request, res: Response) => {
   }
 };
 
-export const getSupplierOrders = async (req: Request, res: Response) => {
+export const getSupplierOrders = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -38,7 +50,7 @@ export const getSupplierOrders = async (req: Request, res: Response) => {
   }
 };
 
-export const getVendorOrders = async (req: Request, res: Response) => {
+export const getVendorOrders = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;
@@ -55,7 +67,7 @@ export const getVendorOrders = async (req: Request, res: Response) => {
   }
 };
 
-export const getOrderDetails = async (req: Request, res: Response) => {
+export const getOrderDetails = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orderId } = req.params;
     const userId = req.user?.id;
@@ -82,7 +94,7 @@ export const getOrderDetails = async (req: Request, res: Response) => {
   }
 };
 
-export const approveOrder = async (req: Request, res: Response) => {
+export const approveOrder = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orderId } = req.params;
     const { notes } = req.body;
@@ -101,7 +113,7 @@ export const approveOrder = async (req: Request, res: Response) => {
   }
 };
 
-export const rejectOrder = async (req: Request, res: Response) => {
+export const rejectOrder = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { orderId } = req.params;
     const { reason } = req.body;
@@ -120,7 +132,7 @@ export const rejectOrder = async (req: Request, res: Response) => {
   }
 };
 
-export const restockProduct = async (req: Request, res: Response) => {
+export const restockProduct = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { productId } = req.params;
     const { quantity } = req.body;
@@ -139,7 +151,7 @@ export const restockProduct = async (req: Request, res: Response) => {
   }
 };
 
-export const getLowStockProducts = async (req: Request, res: Response) => {
+export const getLowStockProducts = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?.id;
     const userRole = req.user?.role;

@@ -4,7 +4,8 @@
   "description": "Backend API for vendor-supplier platform",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "nodemon src/server.ts",
+    "dev": "nodemon src/simple-server.ts",
+    "dev:full": "nodemon src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "jest",

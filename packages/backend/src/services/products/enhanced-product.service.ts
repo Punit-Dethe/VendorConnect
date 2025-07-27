@@ -1,7 +1,7 @@
 import { query } from '../../config/database';
 
 export interface Product {
-  id: number;
+  id: string;
   name: string;
   description: string;
   category: string;
@@ -9,7 +9,7 @@ export interface Product {
   price_per_unit: number;
   stock_quantity: number;
   minimum_stock: number;
-  supplier_id: number;
+  supplier_id: string;
   supplier_name?: string;
   image_url?: string;
   is_active: boolean;
@@ -42,7 +42,7 @@ export interface UpdateProductData {
 
 export interface ProductFilters {
   category?: string;
-  supplierId?: number;
+  supplierId?: string;
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
@@ -103,7 +103,7 @@ export class EnhancedProductService {
     return result.rows;
   }
 
-  async getProductById(id: number): Promise<Product | null> {
+  async getProductById(id: string): Promise<Product | null> {
     const result = await query(`
       SELECT p.*, u.name as supplier_name, sp.business_name as supplier_business_name
       FROM products p
@@ -115,7 +115,7 @@ export class EnhancedProductService {
     return result.rows[0] || null;
   }
 
-  async getProductsBySupplierId(supplierId: number): Promise<Product[]> {
+  async getProductsBySupplierId(supplierId: string): Promise<Product[]> {
     const result = await query(`
       SELECT p.*, u.name as supplier_name, sp.business_name as supplier_business_name
       FROM products p
@@ -128,7 +128,7 @@ export class EnhancedProductService {
     return result.rows;
   }
 
-  async createProduct(supplierId: number, productData: CreateProductData): Promise<Product> {
+  async createProduct(supplierId: string, productData: CreateProductData): Promise<Product> {
     // Validate product data
     if (!productData.name || !productData.category || !productData.unit || productData.price_per_unit <= 0) {
       throw new Error('Invalid product data');
@@ -158,7 +158,7 @@ export class EnhancedProductService {
     return result.rows[0];
   }
 
-  async updateProduct(productId: number, supplierId: number, updateData: UpdateProductData): Promise<Product> {
+  async updateProduct(productId: string, supplierId: string, updateData: UpdateProductData): Promise<Product> {
     // Check if product exists and belongs to supplier
     const existingProduct = await query(`
       SELECT * FROM products WHERE id = $1 AND supplier_id = $2
@@ -169,8 +169,8 @@ export class EnhancedProductService {
     }
 
     // Build dynamic update query
-    const updateFields = [];
-    const params = [];
+    const updateFields: string[] = [];
+    const params: any[] = [];
     let paramCount = 0;
 
     Object.entries(updateData).forEach(([key, value]) => {
@@ -200,7 +200,7 @@ export class EnhancedProductService {
     return result.rows[0];
   }
 
-  async deleteProduct(productId: number, supplierId: number): Promise<void> {
+  async deleteProduct(productId: string, supplierId: string): Promise<void> {
     const result = await query(`
       UPDATE products 
       SET is_active = false, updated_at = CURRENT_TIMESTAMP
@@ -212,7 +212,7 @@ export class EnhancedProductService {
     }
   }
 
-  async updateStock(productId: number, supplierId: number, newStock: number): Promise<Product> {
+  async updateStock(productId: string, supplierId: string, newStock: number): Promise<Product> {
     if (newStock < 0) {
       throw new Error('Stock cannot be negative');
     }
@@ -231,7 +231,7 @@ export class EnhancedProductService {
     return result.rows[0];
   }
 
-  async restockProduct(productId: number, supplierId: number, additionalStock: number): Promise<Product> {
+  async restockProduct(productId: string, supplierId: string, additionalStock: number): Promise<Product> {
     if (additionalStock <= 0) {
       throw new Error('Additional stock must be positive');
     }
@@ -262,7 +262,7 @@ export class EnhancedProductService {
     return product;
   }
 
-  async getLowStockProducts(supplierId?: number): Promise<Product[]> {
+  async getLowStockProducts(supplierId?: string): Promise<Product[]> {
     let whereClause = 'WHERE p.is_active = true AND p.stock_quantity <= p.minimum_stock';
     const params: any[] = [];
 
@@ -291,7 +291,7 @@ export class EnhancedProductService {
     return result.rows.map(row => row.category);
   }
 
-  async getProductAnalytics(supplierId: number) {
+  async getProductAnalytics(supplierId: string) {
     const result = await query(`
       SELECT 
         COUNT(*) as total_products,
@@ -314,14 +314,14 @@ export class EnhancedProductService {
     return analytics;
   }
 
-  private async sendProductNotification(supplierId: number, type: string, message: string) {
+  private async sendProductNotification(supplierId: string, type: string, message: string) {
     await query(`
       INSERT INTO notifications (user_id, type, title, message)
       VALUES ($1, $2, $3, $4)
     `, [supplierId, type, 'Product Update', message]);
   }
 
-  private async notifyVendorsAboutRestock(productId: number, product: any) {
+  private async notifyVendorsAboutRestock(productId: string, product: any) {
     // Find vendors who have ordered this product before
     const vendorsResult = await query(`
       SELECT DISTINCT o.vendor_id, u.name as vendor_name
@@ -347,7 +347,7 @@ export class EnhancedProductService {
   }
 
   // Get products for a specific vendor (with supplier info)
-  async getProductsForVendor(vendorId: number, filters?: ProductFilters): Promise<Product[]> {
+  async getProductsForVendor(vendorId: string, filters?: ProductFilters): Promise<Product[]> {
     // Get vendor's preferred suppliers or all suppliers
     const vendorResult = await query(`
       SELECT preferred_suppliers FROM vendor_profiles WHERE user_id = $1
