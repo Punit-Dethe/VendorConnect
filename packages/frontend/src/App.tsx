@@ -5,6 +5,7 @@ import { checkAuth } from './store/slices/auth.slice'
 import { LoadingSpinner } from './components/common/LoadingSpinner'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import { RealtimeProvider } from './components/realtime/RealtimeProvider'
+import ErrorBoundary from './components/common/ErrorBoundary/ErrorBoundary' // Import ErrorBoundary directly
 
 // Pages
 import LandingPage from './pages/Landing/LandingPage'
@@ -44,194 +45,196 @@ function App() {
 
   return (
     <RealtimeProvider userId={user?.id}>
-      <Routes>
-        {/* Public routes */}
-        <Route
-          path="/"
-          element={
-            isAuthenticated ? (
-              <Navigate to={user?.role === 'vendor' ? '/vendor/home' : '/supplier/dashboard'} replace />
-            ) : (
-              <LandingPage />
-            )
-          }
-        />
+      <ErrorBoundary>
+        <Routes>
+          {/* Public routes */}
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Navigate to={user?.role === 'vendor' ? '/vendor/home' : '/supplier/dashboard'} replace />
+              ) : (
+                <LandingPage />
+              )
+            }
+          />
 
-        {/* Separate login pages */}
-        <Route
-          path="/vendor/login"
-          element={
-            isAuthenticated && user?.role === 'vendor' ? (
-              <Navigate to="/vendor/home" replace />
-            ) : (
-              <VendorLoginPage />
-            )
-          }
-        />
-        <Route
-          path="/supplier/login"
-          element={
-            isAuthenticated && user?.role === 'supplier' ? (
-              <Navigate to="/supplier/dashboard" replace />
-            ) : (
-              <SupplierLoginPage />
-            )
-          }
-        />
+          {/* Separate login pages */}
+          <Route
+            path="/vendor/login"
+            element={
+              isAuthenticated && user?.role === 'vendor' ? (
+                <Navigate to="/vendor/home" replace />
+              ) : (
+                <VendorLoginPage />
+              )
+            }
+          />
+          <Route
+            path="/supplier/login"
+            element={
+              isAuthenticated && user?.role === 'supplier' ? (
+                <Navigate to="/supplier/dashboard" replace />
+              ) : (
+                <SupplierLoginPage />
+              )
+            }
+          />
 
-        {/* Legacy routes for backward compatibility */}
-        <Route
-          path="/login"
-          element={<Navigate to="/" replace />}
-        />
-        <Route
-          path="/register"
-          element={
-            isAuthenticated ? (
-              <Navigate to={user?.role === 'vendor' ? '/vendor/home' : '/supplier/dashboard'} replace />
-            ) : (
-              <RegisterPage />
-            )
-          }
-        />
+          {/* Legacy routes for backward compatibility */}
+          <Route
+            path="/login"
+            element={<Navigate to="/" replace />}
+          />
+          <Route
+            path="/register"
+            element={
+              isAuthenticated ? (
+                <Navigate to={user?.role === 'vendor' ? '/vendor/home' : '/supplier/dashboard'} replace />
+              ) : (
+                <RegisterPage />
+              )
+            }
+          />
 
-        {/* Protected vendor routes */}
-        <Route
-          path="/vendor/home"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <VendorHomePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <VendorDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/orders/place"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <PlaceOrderPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/orders"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <OrdersPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/suppliers"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <SuppliersPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/analytics"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <AnalyticsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/profile"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/supplier/:supplierId"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <SupplierDetailPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/checkout"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <CheckoutPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/vendor/my-orders"
-          element={
-            <ProtectedRoute allowedRoles={['vendor']}>
-              <VendorOrdersPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected vendor routes */}
+          <Route
+            path="/vendor/home"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <VendorHomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <VendorDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/orders/place"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <PlaceOrderPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/orders"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/suppliers"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <SuppliersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/analytics"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <AnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/profile"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/supplier/:supplierId"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <SupplierDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/checkout"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <CheckoutPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vendor/my-orders"
+            element={
+              <ProtectedRoute allowedRoles={['vendor']}>
+                <VendorOrdersPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Protected supplier routes */}
-        <Route
-          path="/supplier/dashboard"
-          element={
-            <ProtectedRoute allowedRoles={['supplier']}>
-              <SupplierDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supplier/orders"
-          element={
-            <ProtectedRoute allowedRoles={['supplier']}>
-              <OrdersPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supplier/products"
-          element={
-            <ProtectedRoute allowedRoles={['supplier']}>
-              <ProductsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supplier/analytics"
-          element={
-            <ProtectedRoute allowedRoles={['supplier']}>
-              <AnalyticsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/supplier/profile"
-          element={
-            <ProtectedRoute allowedRoles={['supplier']}>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected supplier routes */}
+          <Route
+            path="/supplier/dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <SupplierDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/supplier/orders"
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <OrdersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/supplier/products"
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <ProductsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/supplier/analytics"
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <AnalyticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/supplier/profile"
+            element={
+              <ProtectedRoute allowedRoles={['supplier']}>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Contracts routes for both vendor and supplier */}
-        <Route
-          path="/contracts"
-          element={
-            <ProtectedRoute allowedRoles={['vendor', 'supplier']}>
-              <ContractsPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* Contracts routes for both vendor and supplier */}
+          <Route
+            path="/contracts"
+            element={
+              <ProtectedRoute allowedRoles={['vendor', 'supplier']}>
+                <ContractsPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Catch all route */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          {/* Catch all route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ErrorBoundary>
     </RealtimeProvider>
   )
 }

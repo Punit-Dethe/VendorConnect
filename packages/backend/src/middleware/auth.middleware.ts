@@ -1,47 +1,42 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../config/jwt';
 import { AppError } from './error.middleware';
+import { UserRepository } from '../database/repositories/user.repository';
+import { pool } from '../database/connection';
+import asyncHandler from '../utils/asyncHandler';
+import { User } from '@vendor-supplier/shared/src/types'; // Import User type
 
-interface AuthenticatedRequest extends Request {
-  user?: {
-    id: number;
-    mobile: string;
-    name: string;
-    email?: string;
-    role: 'vendor' | 'supplier';
-    trust_score: number;
-    is_verified: boolean;
-  };
+declare global {
+  namespace Express {
+    interface Request {
+      user?: User; // Directly use the User type for req.user
+    }
+  }
 }
 
-export const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+const userRepository = new UserRepository(pool);
+
+export const authenticateToken = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     throw new AppError('Access token is required', 401, 'UNAUTHORIZED');
   }
 
-  try {
-    const decoded = verifyToken(token);
-    // Use the token data directly for now
-    req.user = {
-      id: parseInt(decoded.userId.replace(/\D/g, '')) || 1, // Extract number from userId
-      mobile: decoded.mobile,
-      name: decoded.mobile, // Use mobile as name for now
-      email: undefined,
-      role: decoded.role,
-      trust_score: 75, // Default trust score
-      is_verified: true
-    };
-    next();
-  } catch (error) {
-    throw new AppError('Invalid or expired token', 401, 'UNAUTHORIZED');
+  const decoded = verifyToken(token);
+  const user = await userRepository.findById(decoded.userId);
+
+  if (!user) {
+    throw new AppError('User not found', 401, 'UNAUTHORIZED');
   }
-};
+
+  req.user = user; // Assign the full user object
+  next();
+});
 
 export const requireRole = (allowedRoles: string[]) => {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const user = req.user;
 
     if (!user) {

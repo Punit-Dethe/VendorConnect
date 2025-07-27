@@ -4,6 +4,7 @@ export interface TrustScore {
   factors: TrustScoreFactors;
   totalOrders: number;
   successfulOrders: number;
+  history: TrustScoreHistory[];
   lastUpdated: Date;
 }
 

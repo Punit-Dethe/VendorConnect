@@ -1,63 +1,99 @@
-import axios from 'axios'
-import toast from 'react-hot-toast'
+import axios from 'axios';
+// import { store } from '../store'; // Removed direct import
+// import { logout } from '../store/slices/auth.slice'; // Removed direct import
+import { type AppStore } from '../store'; // Import AppStore type
+import { logout as authLogout } from '../store/slices/auth.slice'; // Import logout action with alias
+import { authService } from './auth.service';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
-export const api = axios.create({
+const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-})
+});
 
-// Request interceptor to add auth token
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value?: any) => void; reject: (reason?: any) => void; originalRequest: any }> = [];
+
+const processQueue = (error: any | null, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+// Request interceptor to add token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token');
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    return config
+    return config;
   },
   (error) => {
-    return Promise.reject(error)
+    return Promise.reject(error);
   }
-)
+);
 
-// Response interceptor to handle errors and token refresh
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config
+// New setup function for response interceptor
+export const setupInterceptors = (store: AppStore) => {
+  api.interceptors.response.use(
+    (response) => {
+      return response;
+    },
+    async (error) => {
+      const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      try {
-        const refreshToken = localStorage.getItem('refreshToken')
-        if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
-            refreshToken,
-          })
-          const { token } = response.data.data
-          localStorage.setItem('token', token)
-          originalRequest.headers.Authorization = `Bearer ${token}`
-          return api(originalRequest)
+      if (error.response?.status === 401 && !originalRequest._retry) {
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({ resolve, reject, originalRequest });
+          });
         }
-      } catch (refreshError) {
-        localStorage.removeItem('token')
-        localStorage.removeItem('refreshToken')
-        window.location.href = '/login'
-        return Promise.reject(refreshError)
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+          const { token } = await authService.refreshToken();
+          localStorage.setItem('token', token);
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          processQueue(null, token);
+          return api(originalRequest);
+        } catch (refreshError) {
+          processQueue(refreshError);
+          store.dispatch(authLogout());
+          return Promise.reject(refreshError);
+        } finally {
+          isRefreshing = false;
+        }
       }
-    }
 
-    // Show error toast for non-401 errors
-    if (error.response?.status !== 401) {
-      const errorMessage = error.response?.data?.error?.message || 'An error occurred'
-      toast.error(errorMessage)
-    }
+      const { response } = error;
 
-    return Promise.reject(error)
-  }
-)
+      if (response) {
+        if (response.status === 403) {
+          console.error('Forbidden access:', response.data.error.message);
+          alert(response.data.error.message || 'You do not have permission to perform this action.');
+        } else if (response.status >= 400 && response.status < 500) {
+          console.error('Client Error:', response.data.error.message);
+          alert(response.data.error.message || 'An error occurred.');
+        } else if (response.status >= 500) {
+          console.error('Server Error:', response.data.error.message);
+          alert('Server error. Please try again later.');
+        }
+      }
+
+      return Promise.reject(error);
+    }
+  );
+};
+
+export default api;

@@ -9,6 +9,8 @@ import authRoutes from './services/auth/auth.routes';
 import productRoutes from './services/products/product.routes';
 import orderRoutes from './services/orders/order.routes';
 import supplierRoutes from './services/suppliers/supplier.routes';
+import trustScoreRoutes from './services/trust-score/trust-score.routes'; // Import TrustScore routes
+import analyticsRoutes from './services/analytics/analytics.routes'; // Import Analytics routes
 
 const app = express();
 
@@ -48,6 +50,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/trust', trustScoreRoutes); // Use TrustScore routes
+app.use('/api/analytics', analyticsRoutes); // Use Analytics routes
 
 // Error handling
 app.use(notFoundHandler);

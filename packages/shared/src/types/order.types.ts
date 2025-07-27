@@ -1,3 +1,5 @@
+import { PaymentStatus } from './payment.types';
+
 export interface OrderItem {
   productId: string;
   productName: string;
@@ -16,6 +18,8 @@ export interface Order {
   totalAmount: number;
   status: OrderStatus;
   orderType: 'one_time' | 'recurring';
+  paymentStatus: PaymentStatus;
+  paymentMethod: string;
   deliveryAddress: string;
   deliveryCity: string;
   deliveryPincode: string;
@@ -39,7 +43,7 @@ export interface RecurringOrder {
   id: string;
   vendorId: string;
   supplierId?: string;
-  frequency: 'monthly';
+  frequency: 'monthly' | 'weekly' | 'daily';
   nextOrderDate: Date;
   isActive: boolean;
   reminderSent: boolean;
@@ -54,11 +58,37 @@ export interface RecurringOrder {
 }
 
 export interface CreateOrderRequest {
-  items: Omit<OrderItem, 'totalPrice'>[];
-  orderType: 'one_time' | 'recurring';
+  vendorId?: string; // Make optional as it might be added by middleware
+  supplierId: string;
+  items: OrderItem[];
   deliveryAddress: string;
   deliveryCity: string;
   deliveryPincode: string;
-  supplierId?: string;
+  deliveryLatitude?: number;
+  deliveryLongitude?: number;
   notes?: string;
+  orderType?: 'one_time' | 'recurring';
+  recurringConfig?: RecurringOrderConfig; // Add recurring config here
+}
+
+export interface UpdateOrderRequest {
+  status?: OrderStatus;
+  estimatedDeliveryTime?: Date;
+  actualDeliveryTime?: Date;
+  notes?: string;
+  paymentStatus?: PaymentStatus;
+}
+
+export interface RecurringOrderConfig {
+  frequency: 'monthly' | 'weekly' | 'daily';
+  nextOrderDate: Date;
+  isActive?: boolean;
+  reminderSent?: boolean;
+  templateData: {
+    items: OrderItem[];
+    deliveryAddress: string;
+    deliveryCity: string;
+    deliveryPincode: string;
+    supplierId?: string; // Add supplierId here
+  };
 }

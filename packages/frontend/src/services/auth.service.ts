@@ -1,5 +1,5 @@
 import { UserLogin, UserRegistration, AuthResponse, User } from '@vendor-supplier/shared'
-import { api } from './api'
+import api from './api'
 
 class AuthService {
   async login(credentials: UserLogin): Promise<AuthResponse> {

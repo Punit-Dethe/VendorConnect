@@ -3,9 +3,13 @@ import ReactDOM from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { BrowserRouter } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import App from './App.tsx'
+import App from './App'
 import { store } from './store'
+import { setupInterceptors } from './services/api' // Import setupInterceptors
 import './index.css'
+
+// Call setupInterceptors after store is created
+setupInterceptors(store);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
