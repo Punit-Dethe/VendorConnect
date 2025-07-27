@@ -30,3 +30,4 @@ router.get('/rankings', trustScoreController.getTrustRankings.bind(trustScoreCon
 router.post('/recalculate', trustScoreController.triggerScoreRecalculation.bind(trustScoreController));
 
 export default router;
+ 

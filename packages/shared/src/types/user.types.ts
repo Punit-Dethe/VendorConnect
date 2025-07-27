@@ -17,36 +17,8 @@ export interface User {
   businessType: string;
   trustScore: number;
   isActive: boolean;
-  isVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
-}
-
-export interface CreateUserRequest {
-  name: string;
-  mobile: string;
-  email?: string;
-  password_hash: string; // The hashed password from registration
-  role: 'vendor' | 'supplier';
-  businessType: string;
-  address: string;
-  city: string;
-  state: string;
-  pincode: string;
-  latitude: number;
-  longitude: number;
-}
-
-export interface UserProfileUpdateRequest {
-  name?: string;
-  email?: string;
-  businessType?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  pincode?: string;
-  latitude?: number;
-  longitude?: number;
 }
 
 export interface UserRegistration {

@@ -1,1189 +1,523 @@
 
 import React, { useState, useEffect } from 'react';
-import { useLocation, Link } from 'react-router-dom';
-import { useAppSelector } from '../../store';
-import {
-  Package,
-  Plus,
-  Edit,
-  Trash2,
-  AlertCircle,
-  TrendingUp,
-  Clock,
-  Check,
-  X,
-  Search,
-  Filter,
-  Star,
-  Users,
-  DollarSign,
-  ShoppingCart,
-  Bell,
-  MessageCircle,
-  FileText,
-  CreditCard,
-  User,
-  Eye,
-  CheckCircle,
-  XCircle
-} from 'lucide-react';
-import api from '../../services/api';
-import ChatModal from '../../components/chat/ChatModal';
+import { Package, BarChart3, TrendingUp, ShoppingCart, AlertTriangle, DollarSign } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useRealtime } from '../../components/realtime/RealtimeProvider';
-
-interface Product {
-  id: string;
-  supplier_id: string;
-  name: string;
-  description: string;
-  category: string;
-  unit: string;
-  price_per_unit: number;
-  stock_quantity: number;
-  min_order_quantity: number;
-  is_available: boolean;
-  images: string[];
-  created_at: string;
-  updated_at: string;
-}
-
-interface Order {
-  id: string;
-  orderNumber: string;
-  vendorName: string;
-  vendorMobile: string;
-  vendorId: string;
-  supplierId: string;
-  items: Array<{
-    product_name: string;
-    quantity: number;
-    unit: string;
-    price_per_unit: number;
-    total_price: number;
-  }>;
-  totalAmount: number;
-  status: string;
-  orderType: string;
-  deliveryAddress: string;
-  deliveryCity: string;
-  deliveryPincode: string;
-  estimatedDeliveryTime?: string;
-  notes?: string;
-  createdAt: string;
-}
-
-interface DashboardStats {
-  totalOrders: number;
-  totalRevenue: number;
-  pendingOrders: number;
-  completedOrders: number;
-}
-
-interface LowStockAlert {
-  id: string;
-  name: string;
-  currentStock: number;
-  minRequired: number;
-}
-
-interface ChatRoom {
-  id: string; // This is the orderId
-  name: string; // Name of the other participant (vendor)
-  lastMessage: string;
-  lastMessageTime: string;
-  unreadCount: number;
-}
+import OrderApprovalModal from '../../components/orders/OrderApprovalModal';
+import { Navigation } from '../../components/common';
 
 const SupplierDashboard: React.FC = () => {
-  const { user } = useAppSelector((state) => state.auth);
-  const location = useLocation();
-  const { isConnected, joinUserRoom } = useRealtime(); // Use realtime context
-  
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalOrders: 0,
-    totalRevenue: 0,
-    pendingOrders: 0,
-    completedOrders: 0
-  });
-  const [trustScore, setTrustScore] = useState(50);
-  const [lowStockAlerts, setLowStockAlerts] = useState<LowStockAlert[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showAddProduct, setShowAddProduct] = useState(false);
-  const [showEditProduct, setShowEditProduct] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showOrderModal, setShowOrderModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [showChatModal, setShowChatModal] = useState(false);
-  const [currentChatRecipient, setCurrentChatRecipient] = useState<{ id: string, name: string } | null>(null);
-  const [currentChatRoomId, setCurrentChatRoomId] = useState<string>('');
-  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
-
-  const [productForm, setProductForm] = useState({
-    name: '',
-    description: '',
-    category: 'vegetables',
-    unit: 'kg',
-    price_per_unit: '',
-    stock_quantity: '',
-    min_order_quantity: '',
-    images: [] as string[]
-  });
-
-  const categories = ['vegetables', 'grains', 'spices', 'dairy', 'oils', 'pulses', 'meat', 'seafood'];
-  const units = ['kg', 'gram', 'liter', 'piece', 'dozen', 'bundle', 'packet'];
+  const navigate = useNavigate();
+  const { notifications } = useRealtime();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    loadDashboardData();
-    loadProducts();
-    loadOrders();
-    loadChatRooms();
-    
-    // Join user room for real-time notifications/messages
-    if (user?.id && isConnected) {
-      joinUserRoom(user.id);
-    }
-  }, [user?.id, isConnected]);
+    fetchDashboardData();
+    fetchOrders();
+  }, []);
 
-  const loadChatRooms = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const response = await api.get('/api/chat/rooms');
-      setChatRooms(response.data.data);
-    } catch (error) {
-      console.error('Failed to load chat rooms:', error);
-    }
-  };
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found, skipping dashboard data fetch');
+        return;
+      }
 
-  const loadDashboardData = async () => {
-    try {
-      const response = await api.get('/api/supplier/dashboard');
-      const data = response.data.data;
-      setStats(data.stats);
-      setTrustScore(data.trustScore);
-      setLowStockAlerts(data.lowStockAlerts || []);
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    }
-  };
-
-  const loadProducts = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/api/supplier/products');
-      setProducts(response.data.data || []);
-    } catch (error) {
-      console.error('Failed to load products:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadOrders = async () => {
-    try {
-      const response = await api.get('/api/supplier/orders');
-      setOrders(response.data.data || []);
-    } catch (error) {
-      console.error('Failed to load orders:', error);
-    }
-  };
-
-  const resetProductForm = () => {
-    setProductForm({
-      name: '',
-      description: '',
-      category: 'vegetables',
-      unit: 'kg',
-      price_per_unit: '',
-      stock_quantity: '',
-      min_order_quantity: '',
-      images: []
-    });
-  };
-
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const { name, description, category, unit, price_per_unit, stock_quantity, min_order_quantity, images } = productForm;
-
-    // Client-side validation for numeric fields
-    if (isNaN(parseFloat(price_per_unit)) || isNaN(parseInt(stock_quantity)) || isNaN(parseInt(min_order_quantity))) {
-      alert('Please enter valid numbers for price, stock, and minimum order quantity.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const productDataToSend = {
-        name,
-        description,
-        category,
-        unit,
-        price_per_unit: parseFloat(price_per_unit),
-        stock_quantity: parseInt(stock_quantity),
-        min_order_quantity: parseInt(min_order_quantity),
-        images,
-      };
-      await api.post('/api/supplier/products', productDataToSend);
-      loadProducts();
-      loadDashboardData();
-      setShowAddProduct(false);
-      resetProductForm();
-    } catch (error: any) {
-      console.error('Failed to add product:', error);
-      alert(error.response?.data?.error?.message || 'Failed to add product');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEditProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedProduct) return;
-
-    const { name, description, category, unit, price_per_unit, stock_quantity, min_order_quantity, images } = productForm;
-
-    // Client-side validation for numeric fields
-    if (isNaN(parseFloat(price_per_unit)) || isNaN(parseInt(stock_quantity)) || isNaN(parseInt(min_order_quantity))) {
-      alert('Please enter valid numbers for price, stock, and minimum order quantity.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const productDataToUpdate = {
-        name,
-        description,
-        category,
-        unit,
-        price_per_unit: parseFloat(price_per_unit),
-        stock_quantity: parseInt(stock_quantity),
-        min_order_quantity: parseInt(min_order_quantity),
-        images,
-      };
-      await api.put(`/api/supplier/products/${selectedProduct.id}`, productDataToUpdate);
-      loadProducts();
-      loadDashboardData();
-      setShowEditProduct(false);
-      setSelectedProduct(null);
-      resetProductForm();
-    } catch (error: any) {
-      console.error('Failed to update product:', error);
-      alert(error.response?.data?.error?.message || 'Failed to update product');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteProduct = async (productId: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
-
-    try {
-      setLoading(true);
-      await api.delete(`/api/supplier/products/${productId}`);
-      loadProducts();
-      loadDashboardData();
-    } catch (error: any) {
-      console.error('Failed to delete product:', error);
-      alert(error.response?.data?.error?.message || 'Failed to delete product');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleApproveOrder = async (orderId: string, estimatedDeliveryTime: string, paymentTerms: string, notes: string) => {
-    try {
-      setLoading(true);
-      await api.post(`/api/supplier/orders/${orderId}/approve`, {
-        estimatedDeliveryTime,
-        paymentTerms,
-        notes
+      const response = await fetch('http://localhost:5000/api/supplier/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
-      loadOrders();
-      loadDashboardData();
-      setShowOrderModal(false);
-      setSelectedOrder(null);
-    } catch (error: any) {
-      console.error('Failed to approve order:', error);
-      alert(error.response?.data?.error?.message || 'Failed to approve order');
-    } finally {
-      setLoading(false);
+
+      if (response.ok) {
+        const result = await response.json();
+        setDashboardData(result.data);
+      } else if (response.status !== 401) {
+        // Only log non-auth errors to prevent automatic logout
+        console.error('Error fetching dashboard data:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Don't logout on network errors
     }
   };
 
-  const handleRejectOrder = async (orderId: string, reason: string) => {
+  const fetchOrders = async () => {
     try {
-      setLoading(true);
-      await api.post(`/api/supplier/orders/${orderId}/reject`, { reason });
-      loadOrders();
-      loadDashboardData();
-      setShowOrderModal(false);
-      setSelectedOrder(null);
-    } catch (error: any) {
-      console.error('Failed to reject order:', error);
-      alert(error.response?.data?.error?.message || 'Failed to reject order');
-    } finally {
-      setLoading(false);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No token found, skipping orders fetch');
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/supplier/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setOrders(result.data);
+      } else if (response.status !== 401) {
+        // Only log non-auth errors to prevent automatic logout
+        console.error('Error fetching orders:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      // Don't logout on network errors
     }
   };
 
-  const editProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setProductForm({
-      name: product.name,
-      description: product.description,
-      category: product.category,
-      unit: product.unit,
-      price_per_unit: product.price_per_unit.toString(),
-      stock_quantity: product.stock_quantity.toString(),
-      min_order_quantity: product.min_order_quantity.toString(),
-      images: product.images || []
-    });
-    setShowEditProduct(true);
+  const handleApproveOrder = async (orderData: {
+    estimatedDeliveryTime: string;
+    paymentTerms: number;
+    notes: string;
+  }) => {
+    if (!selectedOrder) return;
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/supplier/orders/${selectedOrder.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Update orders list
+        setOrders(prev => prev.map(order =>
+          order.id === selectedOrder.id
+            ? { ...order, status: 'approved', ...orderData }
+            : order
+        ));
+
+        // Close modal
+        setIsApprovalModalOpen(false);
+        setSelectedOrder(null);
+
+        // Refresh dashboard data
+        fetchDashboardData();
+
+        alert('Order approved successfully! Contract has been generated.');
+      } else {
+        const error = await response.json();
+        alert(error.error?.message || 'Failed to approve order');
+      }
+    } catch (error) {
+      console.error('Error approving order:', error);
+      alert('Failed to approve order');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRejectOrder = async (reason: string) => {
+    if (!selectedOrder) return;
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/supplier/orders/${selectedOrder.id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      if (response.ok) {
+        // Update orders list
+        setOrders(prev => prev.map(order =>
+          order.id === selectedOrder.id
+            ? { ...order, status: 'rejected', rejectionReason: reason }
+            : order
+        ));
+
+        // Close modal
+        setIsApprovalModalOpen(false);
+        setSelectedOrder(null);
+
+        // Refresh dashboard data
+        fetchDashboardData();
+
+        alert('Order rejected successfully!');
+      } else {
+        const error = await response.json();
+        alert(error.error?.message || 'Failed to reject order');
+      }
+    } catch (error) {
+      console.error('Error rejecting order:', error);
+      alert('Failed to reject order');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openApprovalModal = (order: any) => {
+    setSelectedOrder(order);
+    setIsApprovalModalOpen(true);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'text-yellow-600 bg-yellow-100';
-      case 'accepted': return 'text-blue-600 bg-blue-100';
-      case 'in_progress': return 'text-purple-600 bg-purple-100';
-      case 'out_for_delivery': return 'text-orange-600 bg-orange-100';
-      case 'delivered': return 'text-green-600 bg-green-100';
-      case 'rejected': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'delivered':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const supplierDashboardNavItems = [
-    { to: '#dashboard', label: 'Dashboard', icon: TrendingUp },
-    { to: '#products', label: 'Products', icon: Package },
-    { to: '#orders', label: 'Orders', icon: ShoppingCart },
-    { to: '#analytics', label: 'Analytics', icon: TrendingUp },
-    { to: '#notifications', label: 'Notifications', icon: Bell },
-    { to: '#chat', label: 'Messages', icon: MessageCircle },
-    { to: '#contracts', label: 'Contracts', icon: FileText },
-    { to: '#payments', label: 'Payments', icon: CreditCard },
-    { to: '#profile', label: 'Profile', icon: User }
-  ];
-
-  const isActive = (path: string) => {
-    const hash = path.substring(1);
-    return activeTab === hash;
-  };
-
-  const openChatWithOrder = (order: Order) => {
-    setCurrentChatRecipient({ id: order.vendorId, name: order.vendorName });
-    setCurrentChatRoomId(order.id); // Use order ID as chat room ID
-    setShowChatModal(true);
-  };
+  const pendingOrders = orders.filter(order => order.status === 'pending');
+  const recentNotifications = notifications.slice(0, 5);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Supplier Dashboard</h1>
-              <p className="text-gray-600">Welcome back, {user?.name}!</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+      <Navigation userRole="supplier" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Enhanced Header Section */}
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-6 lg:space-y-0">
+            <div className="flex-1">
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-blue-800 bg-clip-text text-transparent mb-3">
+                Supplier Dashboard
+              </h1>
+              <p className="text-gray-600 text-xl">Welcome back! Here's your business overview.</p>
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 bg-green-50 px-3 py-2 rounded-lg">
-                <Star className="h-5 w-5 text-yellow-400 fill-current" />
-                <span className="font-medium text-green-700">Trust Score: {trustScore}/100</span>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
+              {/* Trust Score Card */}
+              <div className="card card-elevated bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+                <div className="card-content py-4 px-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-3 h-3 bg-purple-500 rounded-full animate-pulse"></div>
+                    <div>
+                      <p className="text-sm font-medium text-purple-700">Trust Score</p>
+                      <p className="font-bold text-2xl text-purple-900">
+                        {dashboardData?.trustScore || 85}/100
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              
-              {lowStockAlerts.length > 0 && (
-                <div className="flex items-center space-x-2 bg-red-50 px-3 py-2 rounded-lg">
-                  <AlertCircle className="h-5 w-5 text-red-500" />
-                  <span className="font-medium text-red-700">{lowStockAlerts.length} Low Stock</span>
+
+              {/* Action Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => navigate('/supplier/products')}
+                  className="btn btn-outline flex items-center space-x-2 hover:bg-blue-50 hover:border-blue-300"
+                >
+                  <Package className="w-4 h-4" />
+                  <span>Manage Products</span>
+                </button>
+                <button
+                  onClick={() => navigate('/supplier/analytics')}
+                  className="btn btn-primary flex items-center space-x-2"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>View Analytics</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Beautiful Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+          <div className="card card-elevated bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 border-blue-300 hover:scale-105 transition-transform duration-300">
+            <div className="card-content p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-blue-700 mb-2">Total Orders</p>
+                  <p className="text-4xl font-bold text-blue-900 mb-1">
+                    {dashboardData?.stats?.totalOrders || 0}
+                  </p>
+                  <p className="text-xs text-blue-600 font-medium">All time orders</p>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <ShoppingCart className="w-7 h-7 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card card-elevated bg-gradient-to-br from-amber-50 via-amber-100 to-amber-200 border-amber-300 hover:scale-105 transition-transform duration-300">
+            <div className="card-content p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-amber-700 mb-2">Pending Orders</p>
+                  <p className="text-4xl font-bold text-amber-900 mb-1">
+                    {pendingOrders.length}
+                  </p>
+                  <p className="text-xs text-amber-600 font-medium">
+                    {pendingOrders.length > 0 ? 'Needs attention' : 'All caught up'}
+                  </p>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <AlertTriangle className="w-7 h-7 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card card-elevated bg-gradient-to-br from-emerald-50 via-emerald-100 to-emerald-200 border-emerald-300 hover:scale-105 transition-transform duration-300">
+            <div className="card-content p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700 mb-2">Total Revenue</p>
+                  <p className="text-4xl font-bold text-emerald-900 mb-1">
+                    ₹{((dashboardData?.stats?.totalRevenue || 0) / 1000).toFixed(0)}K
+                  </p>
+                  <p className="text-xs text-emerald-600 font-medium">
+                    ₹{dashboardData?.stats?.totalRevenue?.toLocaleString() || 0} earned
+                  </p>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <DollarSign className="w-7 h-7 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card card-elevated bg-gradient-to-br from-violet-50 via-violet-100 to-violet-200 border-violet-300 hover:scale-105 transition-transform duration-300">
+            <div className="card-content p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-violet-700 mb-2">Completed</p>
+                  <p className="text-4xl font-bold text-violet-900 mb-1">
+                    {dashboardData?.stats?.completedOrders || 0}
+                  </p>
+                  <p className="text-xs text-violet-600 font-medium">Successful orders</p>
+                </div>
+                <div className="w-14 h-14 bg-gradient-to-br from-violet-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <TrendingUp className="w-7 h-7 text-white" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Pending Orders - Priority Section */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Pending Orders ({pendingOrders.length})
+                </h2>
+                {pendingOrders.length > 0 && (
+                  <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-medium">
+                    Action Required
+                  </span>
+                )}
+              </div>
+
+              {pendingOrders.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No pending orders at the moment</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingOrders.map((order) => (
+                    <div key={order.id} className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-semibold text-lg">{order.orderNumber}</h3>
+                          <p className="text-gray-600">
+                            From: <span className="font-medium">{order.vendor?.name}</span>
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Trust Score: {order.vendor?.trustScore}/100
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-green-600">₹{order.totalAmount}</p>
+                          <p className="text-sm text-gray-500">
+                            {order.items?.length} items
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-600 mb-1">Items:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {order.items?.slice(0, 3).map((item: any, index: number) => (
+                            <span key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              {item.productName} ({item.quantity})
+                            </span>
+                          ))}
+                          {order.items?.length > 3 && (
+                            <span className="text-sm text-gray-500">
+                              +{order.items.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-gray-500">
+                          Ordered: {new Date(order.createdAt).toLocaleString()}
+                        </p>
+                        <button
+                          onClick={() => openApprovalModal(order)}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+                        >
+                          Review Order
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Navigation */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center space-x-4 overflow-x-auto">
-            {supplierDashboardNavItems.map((item) => (
-              <button
-                key={item.to}
-                onClick={() => setActiveTab(item.to.substring(1))}
-                className={`flex items-center space-x-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap ${
-                  isActive(item.to)
-                    ? 'border-indigo-500 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="font-medium">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Dashboard Tab */}
-        {activeTab === 'dashboard' && (
+          {/* Notifications & Quick Stats */}
           <div className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Orders</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.totalOrders}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <ShoppingCart className="w-6 h-6 text-blue-600" />
-                  </div>
+            {/* Recent Notifications */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                Recent Notifications
+              </h3>
+              {recentNotifications.length === 0 ? (
+                <p className="text-gray-500 text-sm">No recent notifications</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentNotifications.map((notification) => (
+                    <div key={notification.id} className="p-3 bg-gray-50 rounded-lg">
+                      <p className="font-medium text-sm">{notification.title}</p>
+                      <p className="text-sm text-gray-600">{notification.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(notification.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                    <p className="text-3xl font-bold text-gray-900">₹{stats.totalRevenue}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Pending Orders</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.pendingOrders}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                    <Clock className="w-6 h-6 text-yellow-600" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between">
-          <div>
-                    <p className="text-sm font-medium text-gray-600">Completed Orders</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.completedOrders}</p>
-                  </div>
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6 text-purple-600" />
-          </div>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Low Stock Alerts */}
-            {lowStockAlerts.length > 0 && (
-              <div className="bg-white rounded-lg shadow">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-xl font-semibold text-red-600 flex items-center">
-                    <AlertCircle className="h-6 w-6 mr-2" />
-                    Low Stock Alerts
-                  </h2>
-                </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {lowStockAlerts.map((alert) => (
-                      <div key={alert.id} className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <h3 className="font-medium text-red-900">{alert.name}</h3>
-                        <p className="text-red-700 text-sm">
-                          Current: {alert.currentStock} | Min Required: {alert.minRequired}
-                        </p>
-              <button
-                          onClick={() => {
-                            const product = products.find(p => p.id === alert.id);
-                            if (product) editProduct(product);
-                          }}
-                          className="mt-2 text-red-600 hover:text-red-800 text-sm font-medium"
-                        >
-                          Restock Now →
-              </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Recent Orders */}
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-semibold">Recent Orders</h2>
-              </div>
-              <div className="p-6">
-                {orders.slice(0, 5).map((order) => (
-                  <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-4">
-                    <div>
-                      <h3 className="font-medium">{order.orderNumber}</h3>
-                      <p className="text-sm text-gray-600">{order.vendorName}</p>
-                      <p className="text-sm text-gray-500">₹{order.totalAmount}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                        {order.status.replace('_', ' ').toUpperCase()}
-                      </span>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {new Date(order.createdAt).toLocaleDateString()}
+            {dashboardData?.lowStockAlerts?.length > 0 && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Low Stock Alerts
+                </h3>
+                <div className="space-y-2">
+                  {dashboardData.lowStockAlerts.map((product: any) => (
+                    <div key={product.id} className="p-2 bg-red-50 border border-red-200 rounded">
+                      <p className="font-medium text-sm">{product.name}</p>
+                      <p className="text-xs text-red-600">
+                        Stock: {product.currentStock} (Min: {product.minRequired})
                       </p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Products Tab */}
-        {activeTab === 'products' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Product Management</h2>
-                  <button
-                    onClick={() => {
-                      resetProductForm();
-                      setShowAddProduct(true);
-                    }}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
-                  >
-                    <Plus className="h-5 w-5" />
-                    <span>Add Product</span>
-                  </button>
-          </div>
-        </div>
-
-              <div className="p-6">
-                {loading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {Array.from({ length: 6 }).map((_, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4 animate-pulse">
-                        <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
-                        <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      </div>
-                    ))}
-                  </div>
-                ) : products.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {products.map((product) => (
-                      <div key={product.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow">
-                        <div className="w-full h-48 bg-gray-100 rounded-lg mb-4 overflow-hidden">
-                          {product.images && product.images.length > 0 ? (
-                            <img
-                              src={product.images[0]}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                              <Package className="h-16 w-16" />
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <h3 className="font-semibold text-lg">{product.name}</h3>
-                            <div className="flex items-center space-x-1">
-                              {product.stock_quantity <= product.min_order_quantity && (
-                                <AlertCircle className="h-5 w-5 text-red-500" />
-                              )}
-                            </div>
-                          </div>
-                          
-                          <p className="text-gray-600 text-sm line-clamp-2">{product.description}</p>
-                          
-                          <div className="flex items-center justify-between">
-                            <span className="text-2xl font-bold text-indigo-600">₹{product.price_per_unit}</span>
-                            <span className="text-gray-500">/{product.unit}</span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                            <div>Stock: {product.stock_quantity} {product.unit}</div>
-                            <div>Min Order: {product.min_order_quantity} {product.unit}</div>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              product.is_available 
-                                ? 'text-green-600 bg-green-100' 
-                                : 'text-red-600 bg-red-100'
-                            }`}>
-                              {product.is_available ? 'Available' : 'Unavailable'}
-                            </span>
-                            <span className="text-xs text-gray-500 capitalize">{product.category}</span>
-        </div>
-
-                          <div className="flex items-center space-x-2 pt-2">
-                            <button
-                              onClick={() => editProduct(product)}
-                              className="flex-1 bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-1"
-                            >
-                              <Edit className="h-4 w-4" />
-                              <span>Edit</span>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteProduct(product.id)}
-                              className="flex-1 bg-red-600 text-white py-2 px-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-1"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              <span>Delete</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Package className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No products yet</h3>
-                    <p className="mt-1 text-sm text-gray-500">Get started by adding your first product.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Orders Tab */}
-        {activeTab === 'orders' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-semibold">Order Management</h2>
-              </div>
-              
-              <div className="divide-y divide-gray-200">
-                {orders.length > 0 ? orders.map((order) => (
-                  <div key={order.id} className="p-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-medium">{order.orderNumber}</h3>
-                        <p className="text-gray-600">Vendor: {order.vendorName}</p>
-                        <p className="text-gray-600">Mobile: {order.vendorMobile}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status.replace('_', ' ').toUpperCase()}
-                        </span>
-                        <p className="text-lg font-bold text-gray-900 mt-1">₹{order.totalAmount}</p>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <h4 className="font-medium mb-2">Order Items:</h4>
-                        <ul className="space-y-1 text-sm text-gray-600">
-                          {order.items.map((item, index) => (
-                            <li key={index}>
-                              {item.product_name} - {item.quantity} {item.unit} × ₹{item.price_per_unit} = ₹{item.total_price}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      
-                      <div>
-                        <h4 className="font-medium mb-2">Delivery Details:</h4>
-                        <p className="text-sm text-gray-600">{order.deliveryAddress}</p>
-                        <p className="text-sm text-gray-600">{order.deliveryCity}, {order.deliveryPincode}</p>
-                        {order.notes && (
-                          <p className="text-sm text-gray-600 mt-2">
-                            <strong>Notes:</strong> {order.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">
-                        Placed on: {new Date(order.createdAt).toLocaleDateString()}
-                      </span>
-                      
-                      {order.status === 'pending' && (
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => {
-                              setSelectedOrder(order);
-                              setShowOrderModal(true);
-                            }}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            <span>Review Order</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setCurrentChatRecipient({ id: order.vendorId, name: order.vendorName });
-                              setCurrentChatRoomId(order.id);
-                              setShowChatModal(true);
-                            }}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                            <span>Chat</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )) : (
-                  <div className="p-6 text-center">
-                    <ShoppingCart className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No orders yet</h3>
-                    <p className="mt-1 text-sm text-gray-500">Orders from vendors will appear here.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Chat Tab */}
-        {activeTab === 'chat' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h2 className="text-xl font-semibold">Messages</h2>
-              </div>
-              <div className="p-6">
-                <h3 className="text-lg font-medium mb-4">Chat Rooms</h3>
-                {chatRooms.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {chatRooms.map((room) => (
-                      <div
-                        key={room.id}
-                        className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between cursor-pointer hover:bg-blue-100 transition-colors"
-                        onClick={() => openChatWithOrder({ id: room.id, orderNumber: '', vendorName: room.name, vendorMobile: '', vendorId: '', supplierId: '', items: [], totalAmount: 0, status: '', orderType: '', deliveryAddress: '', deliveryCity: '', deliveryPincode: '', estimatedDeliveryTime: '', notes: '', createdAt: '' })}
-                      >
-                        <div>
-                          <h4 className="font-medium text-blue-900">{room.name}</h4>
-                          <p className="text-sm text-blue-700">{room.lastMessage}</p>
-                          <p className="text-xs text-blue-500">{room.lastMessageTime}</p>
-                        </div>
-                        {room.unreadCount > 0 && (
-                          <span className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-semibold">
-                            {room.unreadCount}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <MessageCircle className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No chat rooms yet</h3>
-                    <p className="mt-1 text-sm text-gray-500">Start a conversation with a vendor.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Other tabs placeholder */}
-        {!['dashboard', 'products', 'orders', 'chat'].includes(activeTab) && (
-          <div className="bg-white rounded-lg shadow p-6 text-center">
-            <h2 className="text-2xl font-semibold mb-4">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h2>
-            <p className="text-gray-600">This feature is coming soon!</p>
-          </div>
-        )}
-      </div>
-
-      {/* Add Product Modal */}
-      {showAddProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Add New Product</h2>
-                <button
-                  onClick={() => setShowAddProduct(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleAddProduct} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={productForm.name}
-                    onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select
-                    value={productForm.category}
-                    onChange={(e) => setProductForm({...productForm, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    {categories.map(category => (
-                      <option key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                  <select
-                    value={productForm.unit}
-                    onChange={(e) => setProductForm({...productForm, unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    {units.map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={productForm.price_per_unit}
-                    onChange={(e) => setProductForm({...productForm, price_per_unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    value={productForm.stock_quantity}
-                    onChange={(e) => setProductForm({...productForm, stock_quantity: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Order Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    value={productForm.min_order_quantity}
-                    onChange={(e) => setProductForm({...productForm, min_order_quantity: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  required
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex items-center space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowAddProduct(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 transition-colors"
-                >
-                  {loading ? 'Adding...' : 'Add Product'}
-                </button>
-              </div>
-            </form>
+                  ))}
                 </div>
               </div>
             )}
-
-      {/* Edit Product Modal */}
-      {showEditProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Edit Product</h2>
-                <button
-                  onClick={() => setShowEditProduct(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleEditProduct} className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Product Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={productForm.name}
-                    onChange={(e) => setProductForm({...productForm, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select
-                    value={productForm.category}
-                    onChange={(e) => setProductForm({...productForm, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    {categories.map(category => (
-                      <option key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                  <select
-                    value={productForm.unit}
-                    onChange={(e) => setProductForm({...productForm, unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    {units.map(unit => (
-                      <option key={unit} value={unit}>{unit}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Price per Unit (₹)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={productForm.price_per_unit}
-                    onChange={(e) => setProductForm({...productForm, price_per_unit: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    value={productForm.stock_quantity}
-                    onChange={(e) => setProductForm({...productForm, stock_quantity: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Minimum Order Quantity</label>
-                  <input
-                    type="number"
-                    required
-                    value={productForm.min_order_quantity}
-                    onChange={(e) => setProductForm({...productForm, min_order_quantity: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  required
-                  value={productForm.description}
-                  onChange={(e) => setProductForm({...productForm, description: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex items-center space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowEditProduct(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-400 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 transition-colors"
-                >
-                  {loading ? 'Updating...' : 'Update Product'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
-      )}
 
-      {/* Order Review Modal */}
-      {showOrderModal && selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Review Order: {selectedOrder.orderNumber}</h2>
-                <button
-                  onClick={() => setShowOrderModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-medium mb-2">Vendor Details:</h3>
-                  <p className="text-sm text-gray-600">{selectedOrder.vendorName}</p>
-                  <p className="text-sm text-gray-600">{selectedOrder.vendorMobile}</p>
+        {/* All Orders Table */}
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">All Orders</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Order Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Vendor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {orders.map((order) => (
+                  <tr key={order.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {order.orderNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div>
+                        <p className="font-medium">{order.vendor?.name}</p>
+                        <p className="text-xs text-gray-400">{order.vendor?.businessType}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      ₹{order.totalAmount}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {order.status === 'pending' && (
+                        <button
+                          onClick={() => openApprovalModal(order)}
+                          className="text-blue-600 hover:text-blue-900 font-medium"
+                        >
+                          Review
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-
-                <div>
-                  <h3 className="font-medium mb-2">Order Details:</h3>
-                  <p className="text-sm text-gray-600">Total: ₹{selectedOrder.totalAmount}</p>
-                  <p className="text-sm text-gray-600">Type: {selectedOrder.orderType}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium mb-2">Items:</h3>
-                <ul className="space-y-1 text-sm text-gray-600">
-                  {selectedOrder.items.map((item, index) => (
-                    <li key={index}>
-                      {item.product_name} - {item.quantity} {item.unit} × ₹{item.price_per_unit} = ₹{item.total_price}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-medium mb-2">Delivery Address:</h3>
-                <p className="text-sm text-gray-600">{selectedOrder.deliveryAddress}</p>
-                <p className="text-sm text-gray-600">{selectedOrder.deliveryCity}, {selectedOrder.deliveryPincode}</p>
-        </div>
-
-              <div className="border-t pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Delivery Date</label>
-                    <input
-                      type="date"
-                      id="deliveryDate"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-        />
       </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
-                    <select
-                      id="paymentTerms"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="immediate">Immediate Payment</option>
-                      <option value="3_days">3 Days</option>
-                      <option value="7_days">7 Days</option>
-                      <option value="15_days">15 Days</option>
-                      <option value="30_days">30 Days</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
-                  <textarea
-                    id="supplierNotes"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    rows={3}
-                    placeholder="Any special instructions or terms..."
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-3 pt-4">
-                <button
-                  onClick={() => {
-                    const reason = prompt('Please provide a reason for rejection:');
-                    if (reason) {
-                      handleRejectOrder(selectedOrder.id, reason);
-                    }
-                  }}
-                  className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
-                >
-                  <XCircle className="h-4 w-4" />
-                  <span>Reject Order</span>
-                </button>
-                <button
-                  onClick={() => {
-                    const deliveryDate = (document.getElementById('deliveryDate') as HTMLInputElement).value;
-                    const paymentTerms = (document.getElementById('paymentTerms') as HTMLSelectElement).value;
-                    const notes = (document.getElementById('supplierNotes') as HTMLTextAreaElement).value;
-                    
-                    if (!deliveryDate) {
-                      alert('Please select estimated delivery date');
-                      return;
-                    }
-                    
-                    handleApproveOrder(selectedOrder.id, deliveryDate, paymentTerms, notes);
-                  }}
-                  className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  <span>Approve Order</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Chat Modal */}
-      {showChatModal && currentChatRecipient && currentChatRoomId && (
-        <ChatModal
-          isOpen={showChatModal}
-          onClose={() => setShowChatModal(false)}
-          recipientName={currentChatRecipient.name}
-          recipientId={currentChatRecipient.id}
-          chatRoomId={currentChatRoomId}
-        />
-      )}
+      {/* Order Approval Modal */}
+      <OrderApprovalModal
+        order={selectedOrder}
+        isOpen={isApprovalModalOpen}
+        onClose={() => {
+          setIsApprovalModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        onApprove={handleApproveOrder}
+        onReject={handleRejectOrder}
+        isLoading={isLoading}
+      />
     </div>
   );
 };

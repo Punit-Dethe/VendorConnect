@@ -99,8 +99,8 @@ export default function VendorHomePage() {
       });
       
       const newSupplierNotifications = realtimeNotifications.filter(n => n.type === 'new_supplier');
-      if (newSupplierNotifications.length > 0) {
-        console.log('🔄 New supplier registered, refreshing homepage suppliers');
+    if (newSupplierNotifications.length > 0) {
+      console.log('🔄 New supplier registered, refreshing homepage suppliers');
         fetchSuppliers(); // Refresh suppliers when a new one registers
       }
     }

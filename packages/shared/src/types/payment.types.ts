@@ -19,10 +19,8 @@ export type PaymentStatus =
   | 'pending'
   | 'processing'
   | 'completed'
-  | 'paid'
   | 'failed'
-  | 'refunded'
-  | 'overdue';
+  | 'refunded';
 
 export interface InitiatePaymentRequest {
   orderId: string;

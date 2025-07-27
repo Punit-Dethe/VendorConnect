@@ -34,21 +34,19 @@ export type ProductCategoryName =
   | 'seafood';
 
 export interface CreateProductRequest {
-  supplierId: string; // Added supplierId
   categoryId: string;
   name: string;
-  description?: string;
+  description: string;
   unit: string;
   pricePerUnit: number;
   stockQuantity: number;
   minOrderQuantity: number;
   maxOrderQuantity?: number;
   images?: string[];
-  isAvailable?: boolean;
 }
 
 export interface UpdateProductRequest extends Partial<CreateProductRequest> {
-  // isAvailable?: boolean; // Already handled in CreateProductRequest
+  isAvailable?: boolean;
 }
 
 export interface InventoryAlert {

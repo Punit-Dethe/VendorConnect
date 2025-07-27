@@ -24,7 +24,7 @@ export const authenticateToken = asyncHandler(async (req: Request, res: Response
     throw new AppError('Access token is required', 401, 'UNAUTHORIZED');
   }
 
-  const decoded = verifyToken(token);
+    const decoded = verifyToken(token);
   const user = await userRepository.findById(decoded.userId);
 
   if (!user) {
