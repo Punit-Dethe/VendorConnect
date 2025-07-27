@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Search,
   Filter,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react'
 import { Navigation } from '../../components/common'
 import { ChatModal } from '../../components/chat'
+import { useRealtime } from '../../components/realtime/RealtimeProvider'
 
 interface Supplier {
   id: string
@@ -39,14 +41,79 @@ const formatTrustScore = (score: number): string => {
 };
 
 export default function SuppliersPage() {
+  const { notifications } = useRealtime();
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedLocation, setSelectedLocation] = useState('all')
   const [minTrustScore, setMinTrustScore] = useState(0)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [chatModal, setChatModal] = useState<{ isOpen: boolean; supplier: Supplier | null }>({
     isOpen: false,
     supplier: null
   })
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+  // Listen for new supplier notifications
+  useEffect(() => {
+    const newSupplierNotifications = notifications.filter(n => n.type === 'new_supplier');
+    console.log('🔍 All notifications:', notifications);
+    console.log('🔍 New supplier notifications:', newSupplierNotifications);
+
+    if (newSupplierNotifications.length > 0) {
+      console.log('🔄 Refreshing suppliers list due to new supplier notification');
+      // Refresh suppliers list when new supplier joins
+      fetchSuppliers();
+    }
+  }, [notifications]);
+
+  const fetchSuppliers = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/vendor/suppliers', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('🔍 API Response:', result);
+        console.log('🔍 Raw suppliers data:', result.data);
+
+        // Transform API data to match component interface
+        const transformedSuppliers = result.data.map((supplier: any) => ({
+          id: supplier.id,
+          name: supplier.name,
+          businessName: supplier.businessType,
+          trustScore: supplier.trustScore,
+          location: `${supplier.location.city}, ${supplier.location.state}`,
+          deliveryTime: supplier.stats.avgDeliveryTime,
+          rating: 4.2, // Mock rating for now
+          totalOrders: supplier.stats.completedOrders,
+          categories: supplier.categories,
+          description: `${supplier.businessType} serving ${supplier.location.city}`,
+          phone: '9876543210', // Mock phone
+          email: 'supplier@example.com', // Mock email
+          verified: true,
+          joinedDate: new Date().toISOString().split('T')[0],
+          specialties: supplier.categories
+        }));
+        console.log('🔍 Transformed suppliers:', transformedSuppliers);
+        setSuppliers(transformedSuppliers);
+      } else {
+        console.error('Failed to fetch suppliers');
+      }
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const openChat = (supplier: Supplier) => {
     setChatModal({ isOpen: true, supplier })
@@ -56,8 +123,8 @@ export default function SuppliersPage() {
     setChatModal({ isOpen: false, supplier: null })
   }
 
-  // Mock data - replace with actual API calls
-  const suppliers: Supplier[] = [
+  // Mock data for fallback - replace with actual API calls
+  const mockSuppliers: Supplier[] = [
     {
       id: '1',
       name: 'Rajesh Kumar',
@@ -167,8 +234,17 @@ export default function SuppliersPage() {
               <h1 className="text-2xl font-bold text-gray-900">Find Suppliers</h1>
               <p className="text-gray-600">Connect with trusted suppliers in your area</p>
             </div>
-            <div className="text-sm text-gray-600">
-              {filteredSuppliers.length} suppliers found
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-600">
+                {filteredSuppliers.length} suppliers found
+              </div>
+              <button
+                onClick={fetchSuppliers}
+                disabled={isLoading}
+                className="btn btn-outline text-sm px-3 py-1 disabled:opacity-50"
+              >
+                {isLoading ? 'Refreshing...' : 'Refresh'}
+              </button>
             </div>
           </div>
         </div>
@@ -240,153 +316,177 @@ export default function SuppliersPage() {
           </div>
         </div>
 
-        {/* Suppliers Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredSuppliers.map((supplier) => (
-            <div key={supplier.id} className="card">
-              <div className="p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <h3 className="text-lg font-semibold text-gray-900">{supplier.businessName}</h3>
-                      {supplier.verified && (
-                        <Award className="w-5 h-5 text-blue-600" title="Verified Supplier" />
-                      )}
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-gray-500 mt-4">Loading suppliers...</p>
+          </div>
+        ) : (
+          <>
+            {/* Suppliers Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredSuppliers.map((supplier) => (
+                <div key={supplier.id} className="card">
+                  <div className="p-6">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-lg font-semibold text-gray-900">{supplier.businessName}</h3>
+                          {supplier.verified && (
+                            <Award className="w-5 h-5 text-blue-600" title="Verified Supplier" />
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">by {supplier.name}</p>
+                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          <div className="flex items-center">
+                            <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
+                            {supplier.rating} ({supplier.totalOrders} orders)
+                          </div>
+                          <div className="flex items-center">
+                            <MapPin className="w-4 h-4 mr-1" />
+                            {supplier.location}
+                          </div>
+                        </div>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getTrustScoreBg(supplier.trustScore)} ${getTrustScoreColor(supplier.trustScore)}`}>
+                        Trust: {formatTrustScore(supplier.trustScore)}
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600 mb-2">by {supplier.name}</p>
-                    <div className="flex items-center space-x-4 text-sm text-gray-600">
+
+                    {/* Description */}
+                    <p className="text-gray-600 text-sm mb-4">{supplier.description}</p>
+
+                    {/* Categories */}
+                    <div className="mb-4">
+                      <div className="flex flex-wrap gap-2">
+                        {supplier.categories.map((category) => (
+                          <span key={category} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                            {category}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Specialties */}
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Specialties:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {supplier.specialties.map((specialty) => (
+                          <span key={specialty} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                            {specialty}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
+                      <div className="text-center">
+                        <div className="flex items-center justify-center mb-1">
+                          <Clock className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <p className="text-xs text-gray-600">Delivery</p>
+                        <p className="text-sm font-medium">{supplier.deliveryTime}</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center mb-1">
+                          <Package className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <p className="text-xs text-gray-600">Orders</p>
+                        <p className="text-sm font-medium">{supplier.totalOrders}</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center mb-1">
+                          <TrendingUp className="w-4 h-4 text-gray-600" />
+                        </div>
+                        <p className="text-xs text-gray-600">Since</p>
+                        <p className="text-sm font-medium">{new Date(supplier.joinedDate).getFullYear()}</p>
+                      </div>
+                    </div>
+
+                    {/* Contact Info */}
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                       <div className="flex items-center">
-                        <Star className="w-4 h-4 text-yellow-400 fill-current mr-1" />
-                        {supplier.rating} ({supplier.totalOrders} orders)
+                        <Phone className="w-4 h-4 mr-1" />
+                        {supplier.phone}
                       </div>
                       <div className="flex items-center">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        {supplier.location}
+                        <Mail className="w-4 h-4 mr-1" />
+                        {supplier.email}
                       </div>
                     </div>
-                  </div>
-                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${getTrustScoreBg(supplier.trustScore)} ${getTrustScoreColor(supplier.trustScore)}`}>
-                    Trust: {formatTrustScore(supplier.trustScore)}
-                  </div>
-                </div>
 
-                {/* Description */}
-                <p className="text-gray-600 text-sm mb-4">{supplier.description}</p>
-
-                {/* Categories */}
-                <div className="mb-4">
-                  <div className="flex flex-wrap gap-2">
-                    {supplier.categories.map((category) => (
-                      <span key={category} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                        {category}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Specialties */}
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Specialties:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {supplier.specialties.map((specialty) => (
-                      <span key={specialty} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                        {specialty}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-gray-50 rounded-lg">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Clock className="w-4 h-4 text-gray-600" />
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <Link
+                        to={`/vendor/supplier/${supplier.id}`}
+                        className="btn btn-primary flex-1 text-center"
+                      >
+                        <Package className="w-4 h-4 mr-2" />
+                        View Products & Order
+                      </Link>
+                      <button
+                        onClick={() => openChat(supplier)}
+                        className="btn btn-outline"
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        Chat
+                      </button>
+                      <button className="btn btn-outline">
+                        <Phone className="w-4 h-4" />
+                      </button>
                     </div>
-                    <p className="text-xs text-gray-600">Delivery</p>
-                    <p className="text-sm font-medium">{supplier.deliveryTime}</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Package className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <p className="text-xs text-gray-600">Orders</p>
-                    <p className="text-sm font-medium">{supplier.totalOrders}</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <TrendingUp className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <p className="text-xs text-gray-600">Since</p>
-                    <p className="text-sm font-medium">{new Date(supplier.joinedDate).getFullYear()}</p>
                   </div>
                 </div>
+              ))}
+            </div>
 
-                {/* Contact Info */}
-                <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-                  <div className="flex items-center">
-                    <Phone className="w-4 h-4 mr-1" />
-                    {supplier.phone}
-                  </div>
-                  <div className="flex items-center">
-                    <Mail className="w-4 h-4 mr-1" />
-                    {supplier.email}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <button className="btn btn-primary flex-1">
-                    <Package className="w-4 h-4 mr-2" />
-                    View Products
+            {filteredSuppliers.length === 0 && (
+              <div className="text-center py-12">
+                <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No suppliers found</h3>
+                <p className="text-gray-600 mb-4">
+                  Try adjusting your search criteria or filters, or refresh to see new suppliers
+                </p>
+                <div className="space-x-4">
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setSelectedCategory('all')
+                      setSelectedLocation('all')
+                      setMinTrustScore(0)
+                    }}
+                    className="btn btn-primary"
+                  >
+                    Clear Filters
                   </button>
                   <button
-                    onClick={() => openChat(supplier)}
+                    onClick={fetchSuppliers}
                     className="btn btn-outline"
                   >
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Chat
-                  </button>
-                  <button className="btn btn-outline">
-                    <Phone className="w-4 h-4" />
+                    Refresh Suppliers
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            )}
+          </>
 
-        {filteredSuppliers.length === 0 && (
-          <div className="text-center py-12">
-            <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No suppliers found</h3>
-            <p className="text-gray-600 mb-4">
-              Try adjusting your search criteria or filters
-            </p>
-            <button
-              onClick={() => {
-                setSearchQuery('')
-                setSelectedCategory('all')
-                setSelectedLocation('all')
-                setMinTrustScore(0)
-              }}
-              className="btn btn-primary"
-            >
-              Clear Filters
-            </button>
-          </div>
         )}
       </div>
 
       {/* Chat Modal */}
-      {chatModal.supplier && (
-        <ChatModal
-          isOpen={chatModal.isOpen}
-          onClose={closeChat}
-          recipientName={chatModal.supplier.businessName}
-          recipientId={chatModal.supplier.id}
-        />
-      )}
-    </div>
+      {
+        chatModal.supplier && (
+          <ChatModal
+            isOpen={chatModal.isOpen}
+            onClose={closeChat}
+            recipientName={chatModal.supplier.businessName}
+            recipientId={chatModal.supplier.id}
+          />
+        )
+      }
+    </div >
   )
 }

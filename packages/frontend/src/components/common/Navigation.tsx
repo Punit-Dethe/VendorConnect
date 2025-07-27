@@ -52,6 +52,11 @@ export default function Navigation({ userRole }: NavigationProps) {
       icon: Search
     },
     {
+      name: 'Contracts',
+      href: '/contracts',
+      icon: Package
+    },
+    {
       name: 'Analytics',
       href: '/vendor/analytics',
       icon: BarChart3
@@ -72,6 +77,11 @@ export default function Navigation({ userRole }: NavigationProps) {
     {
       name: 'Products',
       href: '/supplier/products',
+      icon: Package
+    },
+    {
+      name: 'Contracts',
+      href: '/contracts',
       icon: Package
     },
     {

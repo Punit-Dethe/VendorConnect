@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   Star,
@@ -70,17 +70,135 @@ const formatTrustScore = (score: number): string => {
 
 export default function SupplierDetailPage() {
   const { supplierId } = useParams()
+  const navigate = useNavigate()
   const { user } = useAppSelector((state: any) => state.auth)
   const dispatch = useAppDispatch()
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [supplier, setSupplier] = useState<Supplier | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false)
+
+  useEffect(() => {
+    if (supplierId) {
+      fetchSupplierDetails();
+    }
+  }, [supplierId]);
+
+  const fetchSupplierDetails = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/vendor/suppliers/${supplierId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const supplierData = result.data;
+
+        // Transform supplier data
+        const transformedSupplier: Supplier = {
+          id: supplierData.id,
+          name: supplierData.name,
+          businessName: supplierData.businessType,
+          trustScore: supplierData.trustScore,
+          location: `${supplierData.location.city}, ${supplierData.location.state}`,
+          deliveryTime: supplierData.stats.avgDeliveryTime,
+          rating: 4.2,
+          totalOrders: supplierData.stats.completedOrders,
+          categories: supplierData.categories,
+          specialties: supplierData.categories,
+          phone: '9876543210',
+          email: 'supplier@example.com',
+          verified: true,
+          joinedDate: new Date().toISOString().split('T')[0],
+          description: `${supplierData.businessType} serving ${supplierData.location.city}`
+        };
+
+        setSupplier(transformedSupplier);
+
+        // Transform products data
+        const transformedProducts: Product[] = supplierData.products.map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          category: product.category,
+          price: product.pricePerUnit,
+          unit: product.unit,
+          stock: product.stockQuantity,
+          minOrder: product.minOrderQuantity,
+          description: product.description,
+          image: product.images?.[0],
+          available: product.isAvailable && product.stockQuantity > 0
+        }));
+
+        setProducts(transformedProducts);
+      }
+    } catch (error) {
+      console.error('Error fetching supplier details:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const placeOrder = async () => {
+    if (cart.length === 0) {
+      alert('Please add items to cart before placing order');
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    try {
+      const token = localStorage.getItem('token');
+      const orderData = {
+        supplierId: supplier?.id,
+        items: cart.map(item => ({
+          productId: item.product.id,
+          quantity: item.quantity
+        })),
+        deliveryAddress: user?.address || '123 Default Address',
+        notes: 'Order placed from supplier detail page',
+        paymentMethod: 'pay_later'
+      };
+
+      const response = await fetch('http://localhost:5000/api/vendor/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert('Order placed successfully! Supplier has been notified.');
+        console.log('Order placed:', result.data);
+
+        // Clear cart and redirect
+        setCart([]);
+        navigate('/vendor/my-orders');
+      } else {
+        const error = await response.json();
+        alert(error.error?.message || 'Failed to place order');
+      }
+    } catch (error) {
+      console.error('Error placing order:', error);
+      alert('Failed to place order');
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
 
   const handleLogout = () => {
     dispatch(logout())
   }
 
-  // Mock supplier data - replace with actual API call
-  const supplier: Supplier = {
+  // Mock supplier data for fallback
+  const mockSupplier: Supplier = {
     id: supplierId || '1',
     name: 'Rajesh Kumar',
     businessName: 'Fresh Vegetables Co.',
@@ -99,8 +217,8 @@ export default function SupplierDetailPage() {
     description: 'Premium quality fresh vegetables and fruits sourced directly from farms. Serving Mumbai vendors for over 5 years with consistent quality and reliable delivery.'
   }
 
-  // Mock products data - replace with actual API call
-  const products: Product[] = [
+  // Use products from state (fetched from API)
+  const mockProducts: Product[] = [
     {
       id: 'prod-1',
       name: 'Fresh Tomatoes',
@@ -158,9 +276,10 @@ export default function SupplierDetailPage() {
     }
   ]
 
-  const categories = ['all', ...Array.from(new Set(products.map(p => p.category)))]
+  const currentProducts = products; // Only use real products from API
+  const categories = ['all', ...Array.from(new Set(currentProducts.map(p => p.category)))]
 
-  const filteredProducts = products.filter(product =>
+  const filteredProducts = currentProducts.filter(product =>
     selectedCategory === 'all' || product.category === selectedCategory
   )
 
@@ -218,6 +337,30 @@ export default function SupplierDetailPage() {
     if (score >= 80) return 'bg-blue-100'
     if (score >= 70) return 'bg-yellow-100'
     return 'bg-red-100'
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-500 mt-4">Loading supplier details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!supplier) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500">Supplier not found</p>
+          <Link to="/vendor/suppliers" className="text-blue-600 hover:text-blue-800 mt-2 inline-block">
+            Back to Suppliers
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -468,13 +611,13 @@ export default function SupplierDetailPage() {
                     </p>
                   </div>
 
-                  <Link
-                    to={`/vendor/checkout?supplierId=${supplier.id}`}
-                    state={{ cart, supplier }}
-                    className="w-full btn btn-primary"
+                  <button
+                    onClick={placeOrder}
+                    disabled={cart.length === 0 || isPlacingOrder}
+                    className="w-full btn btn-primary disabled:opacity-50"
                   >
-                    Proceed to Checkout
-                  </Link>
+                    {isPlacingOrder ? 'Placing Order...' : 'Place Order'}
+                  </button>
                 </div>
               </div>
             </div>

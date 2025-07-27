@@ -5,7 +5,10 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon src/simple-server.ts",
+    "dev:simple": "nodemon src/simple-server.ts",
     "dev:full": "nodemon src/server.ts",
+    "dev:production": "nodemon src/production-server.ts",
+    "production": "ts-node src/production-server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "jest",

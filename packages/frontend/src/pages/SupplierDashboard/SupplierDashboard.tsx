@@ -1,295 +1,425 @@
 
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  TrendingUp,
-  Package,
-  AlertTriangle,
-  Plus,
-  Search,
-  Filter,
-  Star,
-  DollarSign,
-  Users
-} from 'lucide-react'
-import { useAppSelector } from '../../hooks/redux'
-import { Navigation } from '../../components/common'
+import React, { useState, useEffect } from 'react';
+import { useRealtime } from '../../components/realtime/RealtimeProvider';
+import OrderApprovalModal from '../../components/orders/OrderApprovalModal';
+import { Navigation } from '../../components/common';
 
-// Utility functions
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2
-  }).format(amount);
-};
+const SupplierDashboard: React.FC = () => {
+  const { notifications } = useRealtime();
+  const [orders, setOrders] = useState<any[]>([]);
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-const formatTrustScore = (score: number): string => {
-  return `${Math.round(score)}/100`;
-};
+  useEffect(() => {
+    fetchDashboardData();
+    fetchOrders();
+  }, []);
 
-export default function SupplierDashboard() {
-  const { user } = useAppSelector((state: any) => state.auth)
-  const [searchQuery, setSearchQuery] = useState('')
+  const fetchDashboardData = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/supplier/dashboard', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-  // Mock data - replace with actual API calls
-  const dashboardStats = {
-    trustScore: user?.trustScore || 82,
-    totalProducts: 45,
-    lowStockItems: 8,
-    monthlyRevenue: 125000,
-    pendingOrders: 12
-  }
-
-  const recentOrders = [
-    {
-      id: '1',
-      orderNumber: 'ORD-001',
-      vendor: 'Raj\'s Food Cart',
-      items: 'Tomatoes (10kg), Onions (5kg)',
-      amount: 2500,
-      status: 'pending',
-      date: '2024-01-15'
-    },
-    {
-      id: '2',
-      orderNumber: 'ORD-002',
-      vendor: 'Street Delights',
-      items: 'Red Chili (2kg), Turmeric (1kg)',
-      amount: 1800,
-      status: 'accepted',
-      date: '2024-01-14'
-    },
-    {
-      id: '3',
-      orderNumber: 'ORD-003',
-      vendor: 'Mumbai Chaat',
-      items: 'Basmati Rice (25kg)',
-      amount: 3200,
-      status: 'in_progress',
-      date: '2024-01-13'
+      if (response.ok) {
+        const result = await response.json();
+        setDashboardData(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
     }
-  ]
+  };
 
-  const lowStockProducts = [
-    { name: 'Tomatoes', currentStock: 15, minStock: 50, unit: 'kg' },
-    { name: 'Red Chili Powder', currentStock: 8, minStock: 20, unit: 'kg' },
-    { name: 'Basmati Rice', currentStock: 25, minStock: 100, unit: 'kg' },
-  ]
+  const fetchOrders = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/supplier/orders', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setOrders(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    }
+  };
+
+  const handleApproveOrder = async (orderData: {
+    estimatedDeliveryTime: string;
+    paymentTerms: number;
+    notes: string;
+  }) => {
+    if (!selectedOrder) return;
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/supplier/orders/${selectedOrder.id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+
+        // Update orders list
+        setOrders(prev => prev.map(order =>
+          order.id === selectedOrder.id
+            ? { ...order, status: 'approved', ...orderData }
+            : order
+        ));
+
+        // Close modal
+        setIsApprovalModalOpen(false);
+        setSelectedOrder(null);
+
+        // Refresh dashboard data
+        fetchDashboardData();
+
+        alert('Order approved successfully! Contract has been generated.');
+      } else {
+        const error = await response.json();
+        alert(error.error?.message || 'Failed to approve order');
+      }
+    } catch (error) {
+      console.error('Error approving order:', error);
+      alert('Failed to approve order');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRejectOrder = async (reason: string) => {
+    if (!selectedOrder) return;
+
+    setIsLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/api/supplier/orders/${selectedOrder.id}/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      if (response.ok) {
+        // Update orders list
+        setOrders(prev => prev.map(order =>
+          order.id === selectedOrder.id
+            ? { ...order, status: 'rejected', rejectionReason: reason }
+            : order
+        ));
+
+        // Close modal
+        setIsApprovalModalOpen(false);
+        setSelectedOrder(null);
+
+        // Refresh dashboard data
+        fetchDashboardData();
+
+        alert('Order rejected successfully!');
+      } else {
+        const error = await response.json();
+        alert(error.error?.message || 'Failed to reject order');
+      }
+    } catch (error) {
+      console.error('Error rejecting order:', error);
+      alert('Failed to reject order');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const openApprovalModal = (order: any) => {
+    setSelectedOrder(order);
+    setIsApprovalModalOpen(true);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'delivered': return 'bg-green-100 text-green-800'
-      case 'accepted': return 'bg-blue-100 text-blue-800'
-      case 'in_progress': return 'bg-yellow-100 text-yellow-800'
-      case 'pending': return 'bg-gray-100 text-gray-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      case 'in_progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'delivered':
+        return 'bg-purple-100 text-purple-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
-  }
+  };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'Delivered'
-      case 'accepted': return 'Accepted'
-      case 'in_progress': return 'In Progress'
-      case 'pending': return 'Pending'
-      default: return status
-    }
-  }
+  const pendingOrders = orders.filter(order => order.status === 'pending');
+  const recentNotifications = notifications.slice(0, 5);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation userRole="supplier" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Trust Score</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {formatTrustScore(dashboardStats.trustScore)}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                <Star className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-600 h-2 rounded-full"
-                  style={{ width: `${dashboardStats.trustScore}%` }}
-                ></div>
-              </div>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Supplier Dashboard</h1>
+          <div className="flex items-center space-x-4">
+            <div className="bg-white px-4 py-2 rounded-lg shadow">
+              <span className="text-sm text-gray-600">Trust Score: </span>
+              <span className="font-bold text-lg text-purple-600">
+                {dashboardData?.trustScore || 0}
+              </span>
             </div>
           </div>
+        </div>
 
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Products</p>
-                <p className="text-3xl font-bold text-gray-900">{dashboardStats.totalProducts}</p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Package className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-            <p className="text-sm text-red-600 mt-2">
-              {dashboardStats.lowStockItems} low stock items
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold text-gray-700">Total Orders</h3>
+            <p className="text-3xl font-bold text-blue-600">
+              {dashboardData?.stats?.totalOrders || 0}
             </p>
           </div>
 
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Monthly Revenue</p>
-                <p className="text-3xl font-bold text-gray-900">
-                  {formatCurrency(dashboardStats.monthlyRevenue)}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-            <p className="text-sm text-green-600 mt-2">+18% from last month</p>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold text-gray-700">Pending Orders</h3>
+            <p className="text-3xl font-bold text-yellow-600">
+              {pendingOrders.length}
+            </p>
           </div>
 
-          <div className="card p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pending Orders</p>
-                <p className="text-3xl font-bold text-gray-900">{dashboardStats.pendingOrders}</p>
-              </div>
-              <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6 text-yellow-600" />
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 mt-2">Awaiting your response</p>
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold text-gray-700">Revenue</h3>
+            <p className="text-3xl font-bold text-green-600">
+              ₹{dashboardData?.stats?.totalRevenue?.toLocaleString() || 0}
+            </p>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-semibold text-gray-700">Completed Orders</h3>
+            <p className="text-3xl font-bold text-purple-600">
+              {dashboardData?.stats?.completedOrders || 0}
+            </p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Recent Orders */}
+          {/* Pending Orders - Priority Section */}
           <div className="lg:col-span-2">
-            <div className="card">
-              <div className="card-header">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold text-gray-900">Recent Order Requests</h2>
-                  <div className="flex space-x-2">
-                    <button className="btn btn-outline">
-                      <Filter className="w-4 h-4 mr-2" />
-                      Filter
-                    </button>
-                  </div>
-                </div>
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Pending Orders ({pendingOrders.length})
+                </h2>
+                {pendingOrders.length > 0 && (
+                  <span className="bg-red-100 text-red-800 px-2 py-1 rounded-full text-sm font-medium">
+                    Action Required
+                  </span>
+                )}
               </div>
-              <div className="card-content">
+
+              {pendingOrders.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No pending orders at the moment</p>
+                </div>
+              ) : (
                 <div className="space-y-4">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3">
-                          <h3 className="font-medium text-gray-900">{order.orderNumber}</h3>
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                            {getStatusLabel(order.status)}
-                          </span>
+                  {pendingOrders.map((order) => (
+                    <div key={order.id} className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h3 className="font-semibold text-lg">{order.orderNumber}</h3>
+                          <p className="text-gray-600">
+                            From: <span className="font-medium">{order.vendor?.name}</span>
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            Trust Score: {order.vendor?.trustScore}/100
+                          </p>
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">{order.vendor}</p>
-                        <p className="text-sm text-gray-500">{order.items}</p>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-green-600">₹{order.totalAmount}</p>
+                          <p className="text-sm text-gray-500">
+                            {order.items?.length} items
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium text-gray-900">{formatCurrency(order.amount)}</p>
-                        <p className="text-sm text-gray-500">{order.date}</p>
-                        {order.status === 'pending' && (
-                          <div className="flex space-x-2 mt-2">
-                            <button className="btn btn-primary text-xs px-3 py-1">Accept</button>
-                            <button className="btn btn-outline text-xs px-3 py-1">Decline</button>
-                          </div>
-                        )}
+
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-600 mb-1">Items:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {order.items?.slice(0, 3).map((item: any, index: number) => (
+                            <span key={index} className="bg-white px-2 py-1 rounded text-sm">
+                              {item.productName} ({item.quantity})
+                            </span>
+                          ))}
+                          {order.items?.length > 3 && (
+                            <span className="text-sm text-gray-500">
+                              +{order.items.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <p className="text-sm text-gray-500">
+                          Ordered: {new Date(order.createdAt).toLocaleString()}
+                        </p>
+                        <button
+                          onClick={() => openApprovalModal(order)}
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium"
+                        >
+                          Review Order
+                        </button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="mt-6">
-                  <button className="w-full btn btn-outline">View All Orders</button>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Notifications & Quick Stats */}
           <div className="space-y-6">
-            {/* Quick Actions */}
-            <div className="card">
-              <div className="card-header">
-                <h2 className="text-xl font-semibold text-gray-900">Quick Actions</h2>
-              </div>
-              <div className="card-content">
+            {/* Recent Notifications */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                Recent Notifications
+              </h3>
+              {recentNotifications.length === 0 ? (
+                <p className="text-gray-500 text-sm">No recent notifications</p>
+              ) : (
                 <div className="space-y-3">
-                  <Link to="/supplier/products" className="w-full btn btn-primary justify-start">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Product
-                  </Link>
-                  <Link to="/supplier/products" className="w-full btn btn-outline justify-start">
-                    <Package className="w-4 h-4 mr-2" />
-                    Manage Inventory
-                  </Link>
-                  <button className="w-full btn btn-outline justify-start">
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                    View Analytics
-                  </button>
-                  <button className="w-full btn btn-outline justify-start">
-                    <Search className="w-4 h-4 mr-2" />
-                    Find Vendors
-                  </button>
+                  {recentNotifications.map((notification) => (
+                    <div key={notification.id} className="p-3 bg-gray-50 rounded-lg">
+                      <p className="font-medium text-sm">{notification.title}</p>
+                      <p className="text-sm text-gray-600">{notification.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {new Date(notification.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Low Stock Alerts */}
-            <div className="card">
-              <div className="card-header">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-5 h-5 text-red-500" />
-                  <h2 className="text-xl font-semibold text-gray-900">Low Stock Alerts</h2>
-                </div>
-              </div>
-              <div className="card-content">
-                <div className="space-y-3">
-                  {lowStockProducts.map((product, index) => (
-                    <div key={index} className="p-3 bg-red-50 rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="text-sm font-medium text-red-900">{product.name}</p>
-                          <p className="text-sm text-red-700">
-                            {product.currentStock} {product.unit} remaining
-                          </p>
-                        </div>
-                        <button className="btn btn-primary text-xs px-2 py-1">
-                          Restock
-                        </button>
-                      </div>
-                      <div className="mt-2">
-                        <div className="w-full bg-red-200 rounded-full h-2">
-                          <div
-                            className="bg-red-600 h-2 rounded-full"
-                            style={{ width: `${(product.currentStock / product.minStock) * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
+            {dashboardData?.lowStockAlerts?.length > 0 && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Low Stock Alerts
+                </h3>
+                <div className="space-y-2">
+                  {dashboardData.lowStockAlerts.map((product: any) => (
+                    <div key={product.id} className="p-2 bg-red-50 border border-red-200 rounded">
+                      <p className="font-medium text-sm">{product.name}</p>
+                      <p className="text-xs text-red-600">
+                        Stock: {product.currentStock} (Min: {product.minRequired})
+                      </p>
                     </div>
                   ))}
                 </div>
-                <div className="mt-4">
-                  <button className="w-full btn btn-outline text-sm">View All Alerts</button>
-                </div>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
+
+        {/* All Orders Table */}
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">All Orders</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Order Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Vendor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {orders.map((order) => (
+                  <tr key={order.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {order.orderNumber}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div>
+                        <p className="font-medium">{order.vendor?.name}</p>
+                        <p className="text-xs text-gray-400">{order.vendor?.businessType}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      ₹{order.totalAmount}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(order.createdAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {order.status === 'pending' && (
+                        <button
+                          onClick={() => openApprovalModal(order)}
+                          className="text-blue-600 hover:text-blue-900 font-medium"
+                        >
+                          Review
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+
+      {/* Order Approval Modal */}
+      <OrderApprovalModal
+        order={selectedOrder}
+        isOpen={isApprovalModalOpen}
+        onClose={() => {
+          setIsApprovalModalOpen(false);
+          setSelectedOrder(null);
+        }}
+        onApprove={handleApproveOrder}
+        onReject={handleRejectOrder}
+        isLoading={isLoading}
+      />
     </div>
-  )
-}
+  );
+};
+
+export default SupplierDashboard;

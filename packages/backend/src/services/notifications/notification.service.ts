@@ -1,193 +1,220 @@
-import { query } from '../../config/database';
-
-export interface Notification {
-  id: number;
-  user_id: number;
+interface Notification {
+  id: string;
+  userId: string;
   type: string;
   title: string;
   message: string;
-  data?: any;
-  is_read: boolean;
-  created_at: Date;
+  data: any;
+  isRead: boolean;
+  createdAt: Date;
 }
 
 class NotificationService {
-  async createNotification(
-    userId: number,
+  private notifications: Notification[] = [];
+
+  // Create notification
+  createNotification(
+    userId: string,
     type: string,
     title: string,
     message: string,
-    data?: any
-  ): Promise<Notification> {
-    const result = await query(`
-      INSERT INTO notifications (user_id, type, title, message, data)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
-    `, [userId, type, title, message, data ? JSON.stringify(data) : null]);
+    data: any = {}
+  ): Notification {
+    const notification: Notification = {
+      id: this.generateId(),
+      userId,
+      type,
+      title,
+      message,
+      data,
+      isRead: false,
+      createdAt: new Date()
+    };
 
-    return result.rows[0];
+    this.notifications.push(notification);
+    return notification;
   }
 
-  async getUserNotifications(userId: number, limit: number = 50): Promise<Notification[]> {
-    const result = await query(`
-      SELECT * FROM notifications
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      LIMIT $2
-    `, [userId, limit]);
-
-    return result.rows.map(row => ({
-      ...row,
-      data: row.data ? JSON.parse(row.data) : null
-    }));
+  // Get user notifications
+  getUserNotifications(userId: string, limit: number = 50): Notification[] {
+    return this.notifications
+      .filter(n => n.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
   }
 
-  async getUnreadNotifications(userId: number): Promise<Notification[]> {
-    const result = await query(`
-      SELECT * FROM notifications
-      WHERE user_id = $1 AND is_read = false
-      ORDER BY created_at DESC
-    `, [userId]);
-
-    return result.rows.map(row => ({
-      ...row,
-      data: row.data ? JSON.parse(row.data) : null
-    }));
+  // Get unread notifications
+  getUnreadNotifications(userId: string): Notification[] {
+    return this.notifications.filter(n => n.userId === userId && !n.isRead);
   }
 
-  async markAsRead(notificationId: number, userId: number): Promise<boolean> {
-    const result = await query(`
-      UPDATE notifications
-      SET is_read = true
-      WHERE id = $1 AND user_id = $2
-    `, [notificationId, userId]);
-
-    return result.rowCount > 0;
-  }
-
-  async markAllAsRead(userId: number): Promise<number> {
-    const result = await query(`
-      UPDATE notifications
-      SET is_read = true
-      WHERE user_id = $1 AND is_read = false
-    `, [userId]);
-
-    return result.rowCount;
-  }
-
-  async deleteNotification(notificationId: number, userId: number): Promise<boolean> {
-    const result = await query(`
-      DELETE FROM notifications
-      WHERE id = $1 AND user_id = $2
-    `, [notificationId, userId]);
-
-    return result.rowCount > 0;
-  }
-
-  async getNotificationCount(userId: number): Promise<{ total: number; unread: number }> {
-    const result = await query(`
-      SELECT 
-        COUNT(*) as total,
-        COUNT(CASE WHEN is_read = false THEN 1 END) as unread
-      FROM notifications
-      WHERE user_id = $1
-    `, [userId]);
-
+  // Get notification count
+  getNotificationCount(userId: string): { total: number; unread: number } {
+    const userNotifications = this.notifications.filter(n => n.userId === userId);
     return {
-      total: parseInt(result.rows[0].total),
-      unread: parseInt(result.rows[0].unread)
+      total: userNotifications.length,
+      unread: userNotifications.filter(n => !n.isRead).length
     };
   }
 
-  // Predefined notification types for different events
-  async notifyNewOrder(supplierId: number, orderId: number, vendorName: string, orderNumber: string) {
+  // Mark as read
+  markAsRead(notificationId: string, userId: string): boolean {
+    const notification = this.notifications.find(
+      n => n.id === notificationId && n.userId === userId
+    );
+
+    if (notification) {
+      notification.isRead = true;
+      return true;
+    }
+    return false;
+  }
+
+  // Mark all as read
+  markAllAsRead(userId: string): number {
+    const userNotifications = this.notifications.filter(
+      n => n.userId === userId && !n.isRead
+    );
+
+    userNotifications.forEach(n => n.isRead = true);
+    return userNotifications.length;
+  }
+
+  // Delete notification
+  deleteNotification(notificationId: string, userId: string): boolean {
+    const index = this.notifications.findIndex(
+      n => n.id === notificationId && n.userId === userId
+    );
+
+    if (index !== -1) {
+      this.notifications.splice(index, 1);
+      return true;
+    }
+    return false;
+  }
+
+  // Notification templates
+  createOrderNotification(supplierId: string, order: any, vendor: any): Notification {
     return this.createNotification(
       supplierId,
-      'new_order',
-      'New Order Received! 🛒',
-      `${vendorName} has placed a new order #${orderNumber}. Please review and approve.`,
-      { orderId, orderNumber }
+      'order_received',
+      'New Order Received!',
+      `${vendor.name} has placed a new order worth ₹${order.totalAmount}`,
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        vendorId: vendor.id,
+        vendorName: vendor.name,
+        totalAmount: order.totalAmount,
+        itemCount: order.items.length,
+        action: 'view_order'
+      }
     );
   }
 
-  async notifyOrderApproved(vendorId: number, orderId: number, supplierName: string, orderNumber: string) {
+  createOrderApprovedNotification(vendorId: string, order: any, supplier: any): Notification {
     return this.createNotification(
       vendorId,
       'order_approved',
-      'Order Approved! ✅',
-      `Your order #${orderNumber} has been approved by ${supplierName}.`,
-      { orderId, orderNumber }
+      'Order Approved!',
+      `${supplier.name} has approved your order ${order.orderNumber}`,
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        totalAmount: order.totalAmount,
+        estimatedDeliveryTime: order.estimatedDeliveryTime,
+        action: 'view_contract'
+      }
     );
   }
 
-  async notifyOrderRejected(vendorId: number, orderId: number, supplierName: string, orderNumber: string, reason?: string) {
+  createOrderRejectedNotification(vendorId: string, order: any, supplier: any, reason: string): Notification {
     return this.createNotification(
       vendorId,
       'order_rejected',
-      'Order Rejected ❌',
-      `Your order #${orderNumber} has been rejected by ${supplierName}.${reason ? ` Reason: ${reason}` : ''}`,
-      { orderId, orderNumber, reason }
+      'Order Rejected',
+      `${supplier.name} has rejected your order ${order.orderNumber}`,
+      {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        reason,
+        totalAmount: order.totalAmount,
+        action: 'view_order'
+      }
     );
   }
 
-  async notifyPaymentDue(vendorId: number, orderId: number, amount: number, dueDate: string) {
-    return this.createNotification(
-      vendorId,
-      'payment_due',
-      'Payment Due 💰',
-      `Payment of ₹${amount} is due on ${dueDate} for your order.`,
-      { orderId, amount, dueDate }
-    );
-  }
-
-  async notifyPaymentReceived(supplierId: number, orderId: number, amount: number, vendorName: string) {
-    return this.createNotification(
-      supplierId,
-      'payment_received',
-      'Payment Received! 💸',
-      `Payment of ₹${amount} received from ${vendorName}.`,
-      { orderId, amount }
-    );
-  }
-
-  async notifyProductRestocked(vendorId: number, productId: number, productName: string, supplierName: string) {
-    return this.createNotification(
-      vendorId,
-      'product_restocked',
-      'Product Back in Stock! 📦',
-      `"${productName}" is now available from ${supplierName}.`,
-      { productId, productName }
-    );
-  }
-
-  async notifyLowStock(supplierId: number, productId: number, productName: string, currentStock: number) {
-    return this.createNotification(
-      supplierId,
-      'low_stock',
-      'Low Stock Alert! ⚠️',
-      `"${productName}" is running low (${currentStock} remaining). Consider restocking.`,
-      { productId, productName, currentStock }
-    );
-  }
-
-  async notifyContractSigned(userId: number, contractId: number, contractNumber: string, counterpartyName: string) {
+  createContractSignedNotification(userId: string, contract: any, signerName: string): Notification {
     return this.createNotification(
       userId,
       'contract_signed',
-      'Contract Fully Executed! 📋',
-      `Contract #${contractNumber} has been signed by both parties.`,
-      { contractId, contractNumber }
+      'Contract Signed!',
+      `${signerName} has signed contract ${contract.contractNumber}`,
+      {
+        contractId: contract.id,
+        contractNumber: contract.contractNumber,
+        signerName,
+        status: contract.status,
+        action: 'view_contract'
+      }
     );
   }
 
-  async notifyNewSupplier(vendorId: number, supplierId: number, supplierName: string, businessName: string) {
+  createPaymentReminderNotification(vendorId: string, payment: any): Notification {
+    return this.createNotification(
+      vendorId,
+      'payment_reminder',
+      'Payment Due Reminder',
+      `Payment of ₹${payment.amount} is due on ${payment.dueDate}`,
+      {
+        paymentId: payment.id,
+        amount: payment.amount,
+        dueDate: payment.dueDate,
+        orderNumber: payment.orderNumber,
+        action: 'make_payment'
+      }
+    );
+  }
+
+  createStockAlertNotification(supplierId: string, product: any): Notification {
+    return this.createNotification(
+      supplierId,
+      'stock_alert',
+      'Low Stock Alert',
+      `${product.name} is running low on stock (${product.stockQuantity} remaining)`,
+      {
+        productId: product.id,
+        productName: product.name,
+        currentStock: product.stockQuantity,
+        minRequired: product.minOrderQuantity,
+        action: 'restock_product'
+      }
+    );
+  }
+
+  createSupplierRegistrationNotification(vendorId: string, supplier: any): Notification {
     return this.createNotification(
       vendorId,
       'new_supplier',
-      'New Supplier Available! 🏪',
-      `${businessName} (${supplierName}) has joined the platform and is now available in your area.`,
-      { supplierId, supplierName, businessName }
+      'New Supplier Available',
+      `${supplier.name} has joined as a supplier in your area`,
+      {
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        businessType: supplier.businessType,
+        city: supplier.city,
+        categories: supplier.categories,
+        action: 'view_supplier'
+      }
     );
+  }
+
+  private generateId(): string {
+    return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
   }
 }
 

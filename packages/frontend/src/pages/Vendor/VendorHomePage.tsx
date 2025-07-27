@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Search,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useAppSelector, useAppDispatch } from '../../hooks/redux'
 import { logout } from '../../store/slices/auth.slice'
+import { useRealtime } from '../../components/realtime/RealtimeProvider'
 
 interface Supplier {
   id: string
@@ -40,17 +41,83 @@ const formatTrustScore = (score: number): string => {
 export default function VendorHomePage() {
   const { user } = useAppSelector((state: any) => state.auth)
   const dispatch = useAppDispatch()
+  const { notifications } = useRealtime()
   const [activeTab, setActiveTab] = useState<'recommended' | 'search'>('recommended')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedRegion, setSelectedRegion] = useState('all')
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [newSuppliers, setNewSuppliers] = useState<Supplier[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
+  // Listen for new supplier notifications and refresh
+  useEffect(() => {
+    const newSupplierNotifications = notifications.filter(n => n.type === 'new_supplier');
+    if (newSupplierNotifications.length > 0) {
+      console.log('🔄 New supplier registered, refreshing homepage suppliers');
+      fetchSuppliers();
+    }
+  }, [notifications]);
+
+  const fetchSuppliers = async () => {
+    try {
+      setIsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/api/vendor/suppliers', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const transformedSuppliers = result.data.map((supplier: any) => ({
+          id: supplier.id,
+          name: supplier.name,
+          businessName: supplier.businessType,
+          trustScore: supplier.trustScore,
+          location: `${supplier.location.city}, ${supplier.location.state}`,
+          deliveryTime: supplier.stats.avgDeliveryTime,
+          rating: 4.2,
+          totalOrders: supplier.stats.completedOrders,
+          categories: supplier.categories,
+          distance: parseFloat(supplier.location.distance) || 0,
+          specialties: supplier.categories,
+          priceRange: 'medium' as const
+        }));
+
+        setSuppliers(transformedSuppliers);
+
+        // Get recently registered suppliers (last 7 days)
+        const recentSuppliers = transformedSuppliers.filter((supplier: any) => {
+          // For now, show suppliers with low order counts as "new"
+          return supplier.totalOrders < 5;
+        }).slice(0, 3);
+
+        setNewSuppliers(recentSuppliers);
+      }
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     dispatch(logout())
   }
 
-  // Mock recommended suppliers based on trust score and location
-  const recommendedSuppliers: Supplier[] = [
+  // Get recommended suppliers (high trust score, nearby)
+  const recommendedSuppliers = suppliers.filter(supplier =>
+    supplier.trustScore >= 80 && supplier.distance <= 10
+  ).sort((a, b) => b.trustScore - a.trustScore).slice(0, 6);
+
+  // Mock data for fallback (remove when API is fully integrated)
+  const mockRecommendedSuppliers: Supplier[] = [
     {
       id: '1',
       name: 'Rajesh Kumar',
@@ -98,8 +165,10 @@ export default function VendorHomePage() {
     }
   ]
 
-  const allSuppliers: Supplier[] = [
-    ...recommendedSuppliers,
+  // Use real suppliers data, fallback to mock if empty
+  const currentRecommendedSuppliers = recommendedSuppliers.length > 0 ? recommendedSuppliers : mockRecommendedSuppliers;
+  const allSuppliers = suppliers.length > 0 ? suppliers : [
+    ...mockRecommendedSuppliers,
     {
       id: '4',
       name: 'Sunita Patel',
@@ -324,29 +393,63 @@ export default function VendorHomePage() {
         {/* Recommended Suppliers Tab */}
         {activeTab === 'recommended' && (
           <div>
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                Recommended Suppliers for You
-              </h3>
-              <p className="text-gray-600">
-                Based on your location, business type, and trust scores
-              </p>
-            </div>
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-gray-500 mt-4">Loading suppliers...</p>
+              </div>
+            ) : (
+              <>
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+                    Recommended Suppliers for You
+                  </h3>
+                  <p className="text-gray-600">
+                    Based on your location, business type, and trust scores
+                  </p>
+                </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {recommendedSuppliers.map((supplier) => (
-                <SupplierCard key={supplier.id} supplier={supplier} />
-              ))}
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {currentRecommendedSuppliers.map((supplier) => (
+                    <SupplierCard key={supplier.id} supplier={supplier} />
+                  ))}
+                </div>
 
-            <div className="text-center mt-8">
-              <button
-                onClick={() => setActiveTab('search')}
-                className="btn btn-outline"
-              >
-                View All Suppliers
-              </button>
-            </div>
+                {/* New Suppliers Section */}
+                {newSuppliers.length > 0 && (
+                  <div className="mt-12">
+                    <div className="text-center mb-8">
+                      <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+                        🆕 New Suppliers in Your Area
+                      </h3>
+                      <p className="text-gray-600">
+                        Recently registered suppliers ready to serve you
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {newSuppliers.map((supplier) => (
+                        <div key={supplier.id} className="relative">
+                          <SupplierCard supplier={supplier} />
+                          <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                            NEW
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-center mt-8">
+                  <button
+                    onClick={() => setActiveTab('search')}
+                    className="btn btn-outline"
+                  >
+                    View All Suppliers
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

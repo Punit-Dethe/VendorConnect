@@ -1,0 +1,53 @@
+[
+  {
+    "id": 1,
+    "mobile": "9876543210",
+    "password": "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RjkYQ1Wye",
+    "name": "Raj Kumar",
+    "email": "raj@vendor.com",
+    "role": "vendor",
+    "business_type": "Street Food Cart",
+    "address": "123 Street Food Lane",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "pincode": "400001",
+    "latitude": 19.076,
+    "longitude": 72.8777,
+    "trust_score": 75,
+    "created_at": "2025-07-27T05:33:13.018Z"
+  },
+  {
+    "id": 2,
+    "mobile": "9876543211",
+    "password": "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RjkYQ1Wye",
+    "name": "Priya Sharma",
+    "email": "priya@supplier.com",
+    "role": "supplier",
+    "business_type": "Vegetable Supplier",
+    "address": "456 Market Street",
+    "city": "Mumbai",
+    "state": "Maharashtra",
+    "pincode": "400002",
+    "latitude": 19.076,
+    "longitude": 72.8777,
+    "trust_score": 85,
+    "created_at": "2025-07-27T05:33:13.019Z"
+  },
+  {
+    "id": 3,
+    "mobile": "9876543212",
+    "password": "$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RjkYQ1Wye",
+    "name": "Delhi Spices Ltd",
+    "email": "delhi@supplier.com",
+    "role": "supplier",
+    "business_type": "Spice Supplier",
+    "address": "789 Spice Market",
+    "city": "Delhi",
+    "state": "Delhi",
+    "pincode": "110001",
+    "latitude": 28.7041,
+    "longitude": 77.1025,
+    "trust_score": 90,
+    "created_at": "2025-07-27T05:33:13.019Z"
+  }
+]

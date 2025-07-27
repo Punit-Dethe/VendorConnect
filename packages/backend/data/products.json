@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "supplier_id": 2,
+    "name": "Fresh Tomatoes",
+    "description": "Farm fresh red tomatoes",
+    "category": "Vegetables",
+    "unit": "kg",
+    "price_per_unit": 40,
+    "stock_quantity": 100,
+    "minimum_stock": 10,
+    "image_url": "https://images.unsplash.com/photo-1546470427-e5ac89c8ba3a?w=300",
+    "is_active": true,
+    "created_at": "2025-07-27T05:33:13.020Z"
+  },
+  {
+    "id": 2,
+    "supplier_id": 2,
+    "name": "Red Onions",
+    "description": "Premium quality red onions",
+    "category": "Vegetables",
+    "unit": "kg",
+    "price_per_unit": 30,
+    "stock_quantity": 80,
+    "minimum_stock": 15,
+    "image_url": "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=300",
+    "is_active": true,
+    "created_at": "2025-07-27T05:33:13.020Z"
+  },
+  {
+    "id": 3,
+    "supplier_id": 3,
+    "name": "Red Chili Powder",
+    "description": "Spicy red chili powder",
+    "category": "Spices",
+    "unit": "kg",
+    "price_per_unit": 200,
+    "stock_quantity": 25,
+    "minimum_stock": 5,
+    "image_url": "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=300",
+    "is_active": true,
+    "created_at": "2025-07-27T05:33:13.020Z"
+  },
+  {
+    "id": 4,
+    "supplier_id": 3,
+    "name": "Turmeric Powder",
+    "description": "Pure turmeric powder",
+    "category": "Spices",
+    "unit": "kg",
+    "price_per_unit": 180,
+    "stock_quantity": 30,
+    "minimum_stock": 8,
+    "image_url": "https://images.unsplash.com/photo-1615485500704-8e990f9900f7?w=300",
+    "is_active": true,
+    "created_at": "2025-07-27T05:33:13.020Z"
+  }
+]
