@@ -90,13 +90,6 @@ npm run dev
 
 ## 🔐 Test Credentials
 
-### Vendor Account
-- **Mobile**: 9876543210
-- **Password**: password123
-
-### Supplier Account
-- **Mobile**: 9876543211
-- **Password**: password123
 
 ## 📱 User Journey
 
